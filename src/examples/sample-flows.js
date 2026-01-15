@@ -29,9 +29,9 @@ sorting:right -> Normalizer:left
 nes:right -> Normalizer:left
 
 # Identity resolution loop (clean cycle)
-Normalizer:top -> identity:bottom
+Normalizer:top -> identity:left
 identity:right -> KeyProvider:left
-KeyProvider:bottom -> assignment:top
+KeyProvider:bottom -> assignment:right
 assignment:left -> Normalizer:right
 
 # Output flow
@@ -46,14 +46,14 @@ events:
     shape: triangle
     source: sorting
     rate: 2
-    path: sorting -> Normalizer[shape=circle, color=#f59042] -> identity -> KeyProvider[shape=circle, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#10b981] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState
+    path: sorting -> Normalizer[shape=circle, color=#3b82f6] -> identity -> KeyProvider[shape=circle, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#10b981] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState
 
   - name: nes
     color: "#e11d48"
     shape: triangle
     source: nes
     rate: 0.3
-    path: nes -> Normalizer[shape=circle, color=#f59042] -> identity -> KeyProvider[shape=circle, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#f59042] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState`,
+    path: nes -> Normalizer[shape=circle, color=#e11d48] -> identity -> KeyProvider[shape=circle, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#f59042] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState`,
 
   ecommerce: `# E-Commerce Order Processing with Subsystems
 

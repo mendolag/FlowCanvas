@@ -18,6 +18,7 @@ const errorList = document.getElementById('errorList');
 const flowCanvas = document.getElementById('flowCanvas');
 const playPauseBtn = document.getElementById('playPauseBtn');
 const resetViewBtn = document.getElementById('resetViewBtn');
+const reloadBtn = document.getElementById('reloadBtn');
 const speedSlider = document.getElementById('speedSlider');
 const speedValue = document.getElementById('speedValue');
 const spawnSlider = document.getElementById('spawnSlider');
@@ -158,6 +159,20 @@ playPauseBtn.addEventListener('click', () => {
 // Reset view button
 resetViewBtn.addEventListener('click', () => {
   canvas.resetView();
+});
+
+// Reload button
+reloadBtn.addEventListener('click', () => {
+  updateVisualization();
+
+  // Visual feedback (spin icon)
+  const icon = reloadBtn.querySelector('.icon');
+  icon.style.transition = 'transform 0.5s ease';
+  icon.style.transform = 'rotate(360deg)';
+  setTimeout(() => {
+    icon.style.transition = 'none';
+    icon.style.transform = 'rotate(0deg)';
+  }, 500);
 });
 
 // Speed slider
