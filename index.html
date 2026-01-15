@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowCanvas - Streaming Data Flow Visualization</title>
+  <meta name="description"
+    content="Transform DSL descriptions of streaming architectures into animated visualizations" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+</head>
+
+<body>
+  <div id="app">
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo">
+          <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z" />
+            <path d="M2 17l10 5 10-5" />
+            <path d="M2 12l10 5 10-5" />
+          </svg>
+          <span class="logo-text">FlowCanvas</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <!-- Playback controls -->
+        <button class="header-btn" id="playPauseBtn" title="Play/Pause">
+          <svg class="icon play-icon" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <svg class="icon pause-icon hidden" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16" />
+            <rect x="14" y="4" width="4" height="16" />
+          </svg>
+        </button>
+        <button class="header-btn secondary" id="resetViewBtn" title="Fit to View">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
+          </svg>
+        </button>
+
+        <div class="header-divider"></div>
+
+        <!-- Speed slider -->
+        <div class="header-slider">
+          <label for="speedSlider">Speed</label>
+          <input type="range" id="speedSlider" min="0.25" max="4" step="0.25" value="1">
+          <span id="speedValue">1x</span>
+        </div>
+
+        <!-- Rate slider -->
+        <div class="header-slider">
+          <label for="spawnSlider">Rate</label>
+          <input type="range" id="spawnSlider" min="0.5" max="5" step="0.5" value="2">
+          <span id="spawnValue">2/s</span>
+        </div>
+
+        <div class="header-divider"></div>
+
+        <!-- View toggle -->
+        <div class="view-toggle">
+          <button class="view-btn active" data-view="abstract">Abstract</button>
+          <button class="view-btn" data-view="detailed">Detailed</button>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <button class="header-btn export-btn" id="exportGifBtn" title="Export GIF">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          <span>Export GIF</span>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <aside class="editor-panel">
+        <div class="editor-header">
+          <span class="editor-title">DSL Editor</span>
+          <div class="editor-status" id="editorStatus">
+            <span class="status-dot valid"></span>
+            <span class="status-text">Valid</span>
+          </div>
+        </div>
+
+        <!-- Editor with line numbers -->
+        <div class="editor-container">
+          <div class="line-numbers" id="lineNumbers"></div>
+          <textarea id="dslEditor" class="dsl-editor" spellcheck="false"
+            placeholder="# Define your nodes and flows here..."></textarea>
+        </div>
+
+        <!-- Error panel -->
+        <div class="error-panel hidden" id="errorPanel">
+          <div class="error-header">
+            <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>Errors</span>
+          </div>
+          <ul class="error-list" id="errorList"></ul>
+        </div>
+
+        <div class="examples-bar">
+          <span class="examples-label">Examples:</span>
+          <button class="example-btn" data-example="simple">Simple</button>
+          <button class="example-btn" data-example="ecommerce">E-Commerce</button>
+          <button class="example-btn" data-example="etl">ETL Pipeline</button>
+        </div>
+      </aside>
+
+      <section class="canvas-panel">
+        <canvas id="flowCanvas"></canvas>
+      </section>
+    </main>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+
+</html>
