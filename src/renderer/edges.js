@@ -12,42 +12,45 @@ const NODE_GAP = 8;    // Gap between arrow tip and node
 
 /**
  * Draw an edge between two nodes
+ * Draw an edge
  * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {Object} from - Start point {x, y}
- * @param {Object} to - End point {x, y}
- * @param {boolean} active - Whether the edge is active (event passing through)
- * @param {number} offsetIndex - Offset for parallel edges (0 = no offset)
+ * @param {Object} path - Pre-calculated path object
+ * @param {boolean} active - Whether the edge is active
  */
-export function drawEdge(ctx, from, to, active = false, offsetIndex = 0) {
+export function drawEdge(ctx, path, active = false) {
     ctx.save();
 
     const color = active ? EDGE_ACTIVE_COLOR : EDGE_COLOR;
-    const path = getEdgePath(from, to, offsetIndex);
 
     ctx.strokeStyle = color;
-    ctx.lineWidth = active ? 4 : 3; // Increased from 3/2
+    ctx.lineWidth = active ? 4 : 3;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Calculate angle at the end of the curve (tangent from cp2 to end)
-    const angle = Math.atan2(path.end.y - path.cp2.y, path.end.x - path.cp2.x);
-
-    // Calculate actual end point (retracted by gap)
-    // The arrow tip will be here
-    const arrowTip = {
-        x: path.end.x - Math.cos(angle) * NODE_GAP,
-        y: path.end.y - Math.sin(angle) * NODE_GAP
+    // Calculate start gap
+    const startAngle = Math.atan2(path.cp1.y - path.start.y, path.cp1.x - path.start.x);
+    const lineStart = {
+        x: path.start.x + Math.cos(startAngle) * NODE_GAP,
+        y: path.start.y + Math.sin(startAngle) * NODE_GAP
     };
 
-    // Calculate where the line should end (slightly inside the arrow to avoid gaps)
-    // We don't need to subtract ARROW_SIZE fullly because the arrow covers the line
+    // Calculate end gap (arrow tip)
+    const endAngle = Math.atan2(path.end.y - path.cp2.y, path.end.x - path.cp2.x);
+
+    // Calculate actual end point (retracted by gap)
+    const arrowTip = {
+        x: path.end.x - Math.cos(endAngle) * NODE_GAP,
+        y: path.end.y - Math.sin(endAngle) * NODE_GAP
+    };
+
+    // Calculate where the line should end
     const lineEnd = {
-        x: arrowTip.x - Math.cos(angle) * (ARROW_SIZE / 2),
-        y: arrowTip.y - Math.sin(angle) * (ARROW_SIZE / 2)
+        x: arrowTip.x - Math.cos(endAngle) * (ARROW_SIZE / 2),
+        y: arrowTip.y - Math.sin(endAngle) * (ARROW_SIZE / 2)
     };
 
     ctx.beginPath();
-    ctx.moveTo(path.start.x, path.start.y);
+    ctx.moveTo(lineStart.x, lineStart.y);
     ctx.bezierCurveTo(
         path.cp1.x, path.cp1.y,
         path.cp2.x, path.cp2.y,
@@ -55,8 +58,7 @@ export function drawEdge(ctx, from, to, active = false, offsetIndex = 0) {
     );
     ctx.stroke();
 
-    // Draw arrow head at the tip position
-    drawArrowHead(ctx, arrowTip, angle, color);
+    drawArrowHead(ctx, arrowTip, endAngle, color);
 
     ctx.restore();
 }
@@ -97,72 +99,51 @@ export function getBezierPoint(p0, p1, p2, p3, t) {
 }
 
 /**
- * Calculate the path points for an edge (used for animation)
- * Handles forward, backward, and vertical edges
- * @param {Object} from - Start node position {x, y}
- * @param {Object} to - End node position {x, y}
- * @param {number} offsetIndex - Optional offset index
- * @returns {{ start: Object, cp1: Object, cp2: Object, end: Object }}
+ * Calculate the path points for an edge
  */
-export function getEdgePath(from, to, offsetIndex = 0) {
+export function getEdgePath(from, to, offsetIndex = 0, fromSide = 'right', toSide = 'left') {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
-    const absDx = Math.abs(dx);
-    const absDy = Math.abs(dy);
+    const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // Offset calculation
-    const offset = offsetIndex * 15;
-
-    // Determine primary direction
-    // Check if essentially vertical (within 60 degrees of vertical) or perfectly aligned
-    const isVertical = absDy > absDx * 0.5;
-    const isBackward = dx < -20; // Only backward if significantly to the left
-
-    if (isBackward) {
-        // Back-edge: "Squared" style path for straighter look
-        // Go down/up, then accross, then to target
-        const midY = from.y + (to.y - from.y) / 2;
-        const loopHeight = 60 + offset; // Push it out a bit
-
-        // If nodes are close vertically, we need to go around more
-        if (absDy < 50) {
-            const goUp = from.y > to.y;
-            const yPass = goUp ? from.y - loopHeight : from.y + loopHeight;
-
-            return {
-                start: from,
-                cp1: { x: from.x + 30, y: yPass },
-                cp2: { x: to.x - 30, y: yPass },
-                end: to
-            };
-        } else {
-            // S-shape for backward
-            return {
-                start: from,
-                cp1: { x: from.x, y: from.y + dy / 2 },
-                cp2: { x: to.x, y: to.y - dy / 2 },
-                end: to
-            };
+    // Direction vectors for sides
+    const getVector = (side) => {
+        switch (side) {
+            case 'left': return { x: -1, y: 0 };
+            case 'right': return { x: 1, y: 0 };
+            case 'top': return { x: 0, y: -1 };
+            case 'bottom': return { x: 0, y: 1 };
+            default: return { x: 1, y: 0 };
         }
-    } else if (isVertical) {
-        // Vertical connection - Straighter
-        const controlDist = Math.min(absDy * 0.3, 40); // Reduced factor from 0.5
+    };
 
-        return {
-            start: from,
-            cp1: { x: from.x, y: from.y + (dy > 0 ? controlDist : -controlDist) },
-            cp2: { x: to.x, y: to.y + (dy > 0 ? -controlDist : controlDist) },
-            end: to
-        };
-    } else {
-        // Horizontal connection (Forward) - Straighter
-        const controlDist = Math.min(absDx * 0.3, 50); // Reduced factor from 0.5
+    const startDir = getVector(fromSide);
+    const endDir = getVector(toSide);
 
-        return {
-            start: from,
-            cp1: { x: from.x + controlDist, y: from.y },
-            cp2: { x: to.x - controlDist, y: to.y },
-            end: to
-        };
+    // Calculate control point distance
+    // Use a base distance plus a factor of the actual distance
+    // Clamp it to avoid wild loops for close nodes
+    let controlDist = Math.min(dist * 0.5, 150);
+
+    // Minimum control dist to ensure curve has room to leave node
+    controlDist = Math.max(controlDist, 40);
+
+    // If "Backward" (going against the grain), increase loop size
+    // e.g. Right -> Left connection but Target is to the Left of Source
+    const isBackward = (fromSide === 'right' && toSide === 'left' && dx < -20);
+    if (isBackward) {
+        controlDist = Math.max(Math.abs(dy) * 0.5 + 50, 100);
     }
+
+    // Apply offset for parallel edges (simple perpendicular shift not implemented yet, using dist)
+    if (offsetIndex > 0) {
+        controlDist += offsetIndex * 20;
+    }
+
+    return {
+        start: from,
+        cp1: { x: from.x + startDir.x * controlDist, y: from.y + startDir.y * controlDist },
+        cp2: { x: to.x + endDir.x * controlDist, y: to.y + endDir.y * controlDist },
+        end: to
+    };
 }

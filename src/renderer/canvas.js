@@ -298,9 +298,12 @@ export class FlowCanvas {
             if (!fromNode || !toNode) return null;
 
             // Use specified sides or defaults
-            const fromPoint = getConnectionPoint(fromNode, edge.fromSide || 'right');
-            const toPoint = getConnectionPoint(toNode, edge.toSide || 'left');
-            const path = getEdgePath(fromPoint, toPoint);
+            const fromSide = edge.fromSide || 'right';
+            const toSide = edge.toSide || 'left';
+            const fromPoint = getConnectionPoint(fromNode, fromSide);
+            const toPoint = getConnectionPoint(toNode, toSide);
+
+            const path = getEdgePath(fromPoint, toPoint, 0, fromSide, toSide);
 
             return {
                 from: edge.from,
@@ -350,7 +353,7 @@ export class FlowCanvas {
 
         // Draw edges
         for (const edge of this.layoutEdges) {
-            drawEdge(ctx, edge.fromPoint, edge.toPoint, false);
+            drawEdge(ctx, edge.path, false);
         }
 
         // Draw particles (events)
@@ -786,12 +789,6 @@ export class FlowCanvas {
                 ctx.arc(x, y, size / 2, 0, Math.PI * 2);
                 ctx.fill();
         }
-
-        ctx.shadowBlur = 0;
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(x, y, size / 4, 0, Math.PI * 2);
-        ctx.fill();
 
         ctx.restore();
     }
