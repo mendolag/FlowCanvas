@@ -17,7 +17,7 @@ export class FlowCanvas {
         this.topology = null;
         this.layoutNodes = new Map(); // Node positions (in world coordinates)
         this.layoutEdges = []; // Edge paths
-        this.detailed = false;
+
         this.particles = []; // Event particles
         this.delayedParticles = []; // Particles waiting at nodes
 
@@ -174,14 +174,7 @@ export class FlowCanvas {
         this.resetView(); // Auto-fit new topology
     }
 
-    /**
-     * Set detail level
-     * @param {boolean} detailed
-     */
-    setDetailLevel(detailed) {
-        this.detailed = detailed;
-        this.render();
-    }
+
 
     /**
      * Calculate node positions using a simple left-to-right layout
@@ -364,7 +357,7 @@ export class FlowCanvas {
 
         // Draw nodes
         for (const node of this.layoutNodes.values()) {
-            drawNode(ctx, node, this.detailed);
+            drawNode(ctx, node);
         }
 
         ctx.restore();
@@ -628,8 +621,12 @@ export class FlowCanvas {
                 }
             }
 
-            // Default: pick first outgoing edge (or random if we implemented that)
-            return this.layoutEdges.find(e => e.from === nodeId);
+            // Default: pick a random outgoing edge
+            const outgoingEdges = this.layoutEdges.filter(e => e.from === nodeId);
+            if (outgoingEdges.length > 0) {
+                return outgoingEdges[Math.floor(Math.random() * outgoingEdges.length)];
+            }
+            return null;
         };
 
         // Update delayed particles

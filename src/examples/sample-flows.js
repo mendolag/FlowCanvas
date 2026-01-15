@@ -4,7 +4,7 @@
  */
 
 export const EXAMPLES = {
-  simple: `# MAPIC Mail Processing System
+  mapic: `# MAPIC Mail Processing System
 # External event sources (Manual Layout)
 sorting: topic, x=-200, y=-60
 nes: topic, x=-200, y=60
@@ -22,6 +22,10 @@ subsystem "MAPIC":
   normalizedEvents: topic, x=200, y=200
   Consolidator: service, x=400, y=200
   mailpieceState: topic, x=600, y=200
+  historyMapper: service, x=800, y=120
+  summaryMapper: service, x=800, y=200
+  history: topic, x=1000, y=120
+  summary: topic, x=1000, y=200
 
 # Data flows
 # Entry flow
@@ -38,7 +42,8 @@ assignment:left -> Normalizer:right
 Normalizer:bottom -> normalizedEvents:left
 normalizedEvents:right -> Consolidator:left
 Consolidator:right -> mailpieceState:left
-
+normalizedEvents:top -> historyMapper -> history
+mailpieceState -> summaryMapper -> summary
 # Event types
 events:
   - name: sorting

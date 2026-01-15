@@ -24,7 +24,6 @@ const speedValue = document.getElementById('speedValue');
 const spawnSlider = document.getElementById('spawnSlider');
 const spawnValue = document.getElementById('spawnValue');
 const exportGifBtn = document.getElementById('exportGifBtn');
-const viewBtns = document.querySelectorAll('.view-btn');
 const exampleBtns = document.querySelectorAll('.example-btn');
 
 // Initialize canvas and animation
@@ -189,14 +188,7 @@ spawnSlider.addEventListener('input', () => {
   spawnValue.textContent = `${rate}/s`;
 });
 
-// View toggle
-viewBtns.forEach(btn => {
-  btn.addEventListener('click', () => {
-    viewBtns.forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    canvas.setDetailLevel(btn.dataset.view === 'detailed');
-  });
-});
+
 
 // Example buttons
 exampleBtns.forEach(btn => {
@@ -255,7 +247,7 @@ document.addEventListener('keydown', (e) => {
 });
 
 // Initialize with sample topology
-dslEditor.value = getExample('simple');
+dslEditor.value = getExample('mapic');
 updateLineNumbers();
 updateVisualization();
 

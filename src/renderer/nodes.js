@@ -51,7 +51,7 @@ export function getNodeColors(type) {
  * @param {Object} node - Node object with id, type, x, y, attributes
  * @param {boolean} detailed - Whether to show detailed info
  */
-export function drawNode(ctx, node, detailed = false) {
+export function drawNode(ctx, node) {
     const { type, x, y, id, attributes } = node;
     const size = getNodeSize(type);
     const colors = getNodeColors(type);
@@ -63,7 +63,7 @@ export function drawNode(ctx, node, detailed = false) {
             drawService(ctx, x, y, size, colors, id);
             break;
         case 'topic':
-            drawTopic(ctx, x, y, size, colors, id, detailed ? attributes.partitions : null);
+            drawTopic(ctx, x, y, size, colors, id, attributes.partitions);
             break;
         case 'db':
             drawDatabase(ctx, x, y, size, colors, id);
