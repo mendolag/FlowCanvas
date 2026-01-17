@@ -3,8 +3,10 @@
  * Updated with new features: event sources, delays, transformations, subsystems
  */
 
-export const EXAMPLES = {
-  mapic: `# MAPIC Mail Processing System
+export type ExampleName = 'mapic' | 'ecommerce' | 'etl';
+
+export const EXAMPLES: Record<ExampleName, string> = {
+    mapic: `# MAPIC Mail Processing System
 # External event sources (Manual Layout)
 sorting: topic, x=-200, y=-60
 nes: topic, x=-200, y=60
@@ -60,7 +62,7 @@ events:
     rate: 0.3
     path: nes -> Normalizer[shape=circle, color=#e11d48] -> identity -> KeyProvider[shape=circle, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#f59042] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState`,
 
-  ecommerce: `# E-Commerce Order Processing with Subsystems
+    ecommerce: `# E-Commerce Order Processing with Subsystems
 
 # Frontend subsystem
 subsystem "Frontend":
@@ -103,7 +105,7 @@ events:
     source: web-gateway
     rate: 0.3`,
 
-  etl: `# ETL Data Pipeline
+    etl: `# ETL Data Pipeline
 # Sources
 source-db: db
 file-ingestion: external
@@ -144,9 +146,7 @@ events:
 
 /**
  * Get an example by name
- * @param {string} name - Example name
- * @returns {string} - DSL text
  */
-export function getExample(name) {
-  return EXAMPLES[name] || EXAMPLES.simple;
+export function getExample(name: string): string {
+    return EXAMPLES[name as ExampleName] || EXAMPLES.mapic;
 }

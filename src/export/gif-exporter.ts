@@ -5,30 +5,33 @@
  */
 
 import GIF from 'gif.js';
+import type { FlowCanvas } from '../renderer/canvas';
+import type { AnimationEngine } from '../animation/engine';
+import type { GifExportOptions } from '../types';
 
 /**
  * Export the canvas animation as a GIF
- * @param {FlowCanvas} flowCanvas - The canvas instance
- * @param {AnimationEngine} animationEngine - The animation engine
- * @param {Object} options - Export options
- * @param {Function} onProgress - Progress callback (0-1)
- * @returns {Promise<Blob>} - The GIF blob
  */
-export async function exportGif(flowCanvas, animationEngine, options = {}, onProgress = () => { }) {
+export async function exportGif(
+    flowCanvas: FlowCanvas,
+    animationEngine: AnimationEngine,
+    options: Partial<GifExportOptions> = {},
+    onProgress: (progress: number) => void = () => { }
+): Promise<Blob> {
     const {
-        duration = 3000, // Total duration in ms
+        duration = 3000,
         fps = 20,
         width = 800,
         height = 450,
-        quality = 10 // 1-30, lower is better
+        quality = 10
     } = options;
 
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve, _reject) => {
         // Create a temporary canvas for recording
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = width;
         tempCanvas.height = height;
-        const tempCtx = tempCanvas.getContext('2d');
+        const tempCtx = tempCanvas.getContext('2d')!;
 
         // Create GIF encoder
         const gif = new GIF({
@@ -53,10 +56,10 @@ export async function exportGif(flowCanvas, animationEngine, options = {}, onPro
         animationEngine.setSpeed(1);
 
         // Capture frames
-        const captureFrame = () => {
+        const captureFrame = (): void => {
             if (currentFrame >= totalFrames) {
                 // Finalize GIF
-                gif.on('finished', (blob) => {
+                gif.on('finished', (blob: Blob) => {
                     // Restore original state
                     animationEngine.setSpeed(originalSpeed);
                     if (wasPlaying) {
@@ -119,10 +122,8 @@ export async function exportGif(flowCanvas, animationEngine, options = {}, onPro
 
 /**
  * Download a blob as a file
- * @param {Blob} blob - The blob to download
- * @param {string} filename - Filename
  */
-export function downloadBlob(blob, filename = 'flowcanvas-animation.gif') {
+export function downloadBlob(blob: Blob, filename: string = 'flowcanvas-animation.gif'): void {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

@@ -2,38 +2,49 @@
  * FlowCanvas DSL Parser
  * 
  * Parses a simple DSL format into a structured topology object.
- * 
- * DSL Format:
- * - Node definitions: name: type[, attribute=value]
- *   - delay=500 (ms delay for events passing through)
- *   - transform=circle|triangle|square (changes event shape)
- *   - transformColor=#hex (changes event color)
- *   - subsystem=name (group nodes into a named subsystem)
- * - Flow connections: node1 -> node2 -> node3
- * - Subsystem definitions:
- *   subsystem "Name":
- *     node1: type
- *     node2: type
- * - Event definitions (YAML-like):
- *   events:
- *     - name: eventName
- *       color: "#hex"
- *       shape: circle|triangle|square
- *       size: small|medium|large (or number like 0.5-2)
- *       source: nodeName (which node spawns this event)
- *       rate: 2 (events per second, optional)
  */
 
-const NODE_TYPES = ['service', 'topic', 'db', 'processor', 'external'];
-const EVENT_SHAPES = ['circle', 'triangle', 'square'];
+import type {
+    Node,
+    NodeType,
+    NodeAttributes,
+    Edge,
+    Side,
+    FlowEvent,
+    EventShape,
+    PathStep,
+    Subsystem,
+    ParseError,
+    Topology,
+    ValidationResult,
+} from '../types';
+
+const NODE_TYPES: readonly NodeType[] = ['service', 'topic', 'db', 'processor', 'external'];
+const EVENT_SHAPES: readonly EventShape[] = ['circle', 'triangle', 'square'];
+const VALID_SIDES: readonly Side[] = ['top', 'bottom', 'left', 'right'];
+
+// Internal types for parsing state
+interface ParserSubsystem {
+    name: string;
+    nodes: string[];
+    color: string | null;
+}
+
+interface ParserEvent {
+    name: string;
+    color: string;
+    shape: EventShape;
+    size: number;
+    source: string | null;
+    rate: number;
+    path?: PathStep[];
+}
 
 /**
  * Parse the DSL text into a topology object
- * @param {string} dsl - The DSL text to parse
- * @returns {{ nodes: Array, edges: Array, events: Array, subsystems: Array, errors: Array }}
  */
-export function parseDSL(dsl) {
-    const result = {
+export function parseDSL(dsl: string): Topology {
+    const result: Topology = {
         nodes: [],
         edges: [],
         events: [],
@@ -46,12 +57,12 @@ export function parseDSL(dsl) {
     }
 
     const lines = dsl.split('\n');
-    const nodeMap = new Map();
-    const subsystemMap = new Map();
+    const nodeMap = new Map<string, Node>();
+    const subsystemMap = new Map<string, ParserSubsystem>();
     let inEventsBlock = false;
     let inSubsystemBlock = false;
-    let currentSubsystem = null;
-    let currentEvent = null;
+    let currentSubsystem: ParserSubsystem | null = null;
+    let currentEvent: ParserEvent | null = null;
 
     for (let i = 0; i < lines.length; i++) {
         const lineNum = i + 1;
@@ -108,8 +119,8 @@ export function parseDSL(dsl) {
 
                     if (nodeName && definition) {
                         const parts = definition.split(',').map(p => p.trim());
-                        const type = parts[0];
-                        const attributes = { subsystem: currentSubsystem.name };
+                        const type = parts[0] as NodeType;
+                        const attributes: NodeAttributes = { subsystem: currentSubsystem.name };
 
                         if (NODE_TYPES.includes(type)) {
                             // Parse attributes
@@ -118,20 +129,21 @@ export function parseDSL(dsl) {
                                 const eqIndex = attr.indexOf('=');
                                 if (eqIndex > 0) {
                                     const key = attr.substring(0, eqIndex).trim();
-                                    let value = attr.substring(eqIndex + 1).trim();
+                                    const value = attr.substring(eqIndex + 1).trim();
 
                                     if (key === 'delay' || key === 'partitions') {
                                         attributes[key] = parseInt(value, 10);
                                     } else if (key === 'transform') {
-                                        if (EVENT_SHAPES.includes(value)) {
-                                            attributes.transform = value;
+                                        if (EVENT_SHAPES.includes(value as EventShape)) {
+                                            attributes.transform = value as EventShape;
                                         }
                                     } else if (key === 'transformColor') {
                                         attributes.transformColor = value.replace(/['"]/g, '');
                                     } else if (key === 'x' || key === 'y') {
                                         attributes[key] = parseInt(value, 10);
                                     } else {
-                                        attributes[key] = isNaN(value) ? value : Number(value);
+                                        const numVal = Number(value);
+                                        attributes[key] = isNaN(numVal) ? value : numVal;
                                     }
                                 }
                             }
@@ -160,7 +172,7 @@ export function parseDSL(dsl) {
             // Event list item start
             if (trimmed.startsWith('- name:')) {
                 if (currentEvent) {
-                    result.events.push(currentEvent);
+                    result.events.push(currentEvent as FlowEvent);
                 }
                 const name = trimmed.substring(7).trim();
                 currentEvent = {
@@ -182,8 +194,8 @@ export function parseDSL(dsl) {
 
             if (currentEvent && trimmed.startsWith('shape:')) {
                 const shape = trimmed.substring(6).trim();
-                if (EVENT_SHAPES.includes(shape)) {
-                    currentEvent.shape = shape;
+                if (EVENT_SHAPES.includes(shape as EventShape)) {
+                    currentEvent.shape = shape as EventShape;
                 } else {
                     result.errors.push({
                         line: lineNum,
@@ -235,7 +247,7 @@ export function parseDSL(dsl) {
                     if (match) {
                         const nodeId = match[1];
                         const attrStr = match[2];
-                        const attributes = {};
+                        const attributes: Record<string, string> = {};
 
                         attrStr.split(',').forEach(pair => {
                             const [key, val] = pair.split('=').map(p => p.trim());
@@ -259,7 +271,7 @@ export function parseDSL(dsl) {
             // If line doesn't start with whitespace or dash, we're done with events
             if (!line.startsWith(' ') && !line.startsWith('\t') && !trimmed.startsWith('-')) {
                 if (currentEvent) {
-                    result.events.push(currentEvent);
+                    result.events.push(currentEvent as FlowEvent);
                     currentEvent = null;
                 }
                 inEventsBlock = false;
@@ -275,25 +287,23 @@ export function parseDSL(dsl) {
             for (let j = 0; j < parts.length - 1; j++) {
                 let from = parts[j];
                 let to = parts[j + 1];
-                let fromSide = 'right';
-                let toSide = 'left';
+                let fromSide: Side = 'right';
+                let toSide: Side = 'left';
 
                 // Parse explicit sides (node:side)
                 if (from.includes(':')) {
                     const [name, side] = from.split(':');
                     from = name.trim();
-                    const validSides = ['top', 'bottom', 'left', 'right'];
-                    if (validSides.includes(side.trim())) {
-                        fromSide = side.trim();
+                    if (VALID_SIDES.includes(side.trim() as Side)) {
+                        fromSide = side.trim() as Side;
                     }
                 }
 
                 if (to.includes(':')) {
                     const [name, side] = to.split(':');
                     to = name.trim();
-                    const validSides = ['top', 'bottom', 'left', 'right'];
-                    if (validSides.includes(side.trim())) {
-                        toSide = side.trim();
+                    if (VALID_SIDES.includes(side.trim() as Side)) {
+                        toSide = side.trim() as Side;
                     }
                 }
 
@@ -335,8 +345,8 @@ export function parseDSL(dsl) {
 
             // Parse type and attributes
             const parts = definition.split(',').map(p => p.trim());
-            const type = parts[0];
-            const attributes = {};
+            const type = parts[0] as NodeType;
+            const attributes: NodeAttributes = {};
 
             if (!NODE_TYPES.includes(type)) {
                 result.errors.push({
@@ -352,14 +362,14 @@ export function parseDSL(dsl) {
                 const eqIndex = attr.indexOf('=');
                 if (eqIndex > 0) {
                     const key = attr.substring(0, eqIndex).trim();
-                    let value = attr.substring(eqIndex + 1).trim();
+                    const value = attr.substring(eqIndex + 1).trim();
 
                     // Handle special attributes
                     if (key === 'delay' || key === 'partitions') {
                         attributes[key] = parseInt(value, 10);
                     } else if (key === 'transform') {
-                        if (EVENT_SHAPES.includes(value)) {
-                            attributes.transform = value;
+                        if (EVENT_SHAPES.includes(value as EventShape)) {
+                            attributes.transform = value as EventShape;
                         }
                     } else if (key === 'transformColor') {
                         attributes.transformColor = value.replace(/['"]/g, '');
@@ -373,11 +383,12 @@ export function parseDSL(dsl) {
                                 color: null
                             });
                         }
-                        subsystemMap.get(attributes.subsystem).nodes.push(nodeName);
+                        subsystemMap.get(attributes.subsystem)!.nodes.push(nodeName);
                     } else if (key === 'x' || key === 'y') {
                         attributes[key] = parseInt(value, 10);
                     } else {
-                        attributes[key] = isNaN(value) ? value : Number(value);
+                        const numVal = Number(value);
+                        attributes[key] = isNaN(numVal) ? value : numVal;
                     }
                 }
             }
@@ -391,7 +402,7 @@ export function parseDSL(dsl) {
         subsystemMap.set(currentSubsystem.name, currentSubsystem);
     }
     if (currentEvent) {
-        result.events.push(currentEvent);
+        result.events.push(currentEvent as FlowEvent);
     }
 
     // Convert maps to arrays
@@ -400,9 +411,14 @@ export function parseDSL(dsl) {
 
     // Add default events if none defined
     if (result.events.length === 0) {
-        result.events.push(
-            { name: 'event', color: '#6366f1', shape: 'circle', size: 1, source: null, rate: 2 }
-        );
+        result.events.push({
+            name: 'event',
+            color: '#6366f1',
+            shape: 'circle',
+            size: 1,
+            source: null,
+            rate: 2
+        });
     }
 
     return result;
@@ -410,11 +426,9 @@ export function parseDSL(dsl) {
 
 /**
  * Validate a topology structure
- * @param {{ nodes: Array, edges: Array, events: Array, subsystems: Array }} topology
- * @returns {{ valid: boolean, errors: Array }}
  */
-export function validateTopology(topology) {
-    const errors = [];
+export function validateTopology(topology: Topology): ValidationResult {
+    const errors: string[] = [];
     const nodeIds = new Set(topology.nodes.map(n => n.id));
 
     // Check that all edges reference valid nodes

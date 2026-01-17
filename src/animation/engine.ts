@@ -2,24 +2,35 @@
  * FlowCanvas Animation Engine
  * 
  * Handles the main animation loop for event particles.
- * Now supports per-event spawn rates and specific source nodes.
+ * Supports per-event spawn rates and specific source nodes.
  */
 
+import type { FlowCanvas } from '../renderer/canvas';
+import type { FlowEvent, EventTimer } from '../types';
+
 export class AnimationEngine {
-    constructor(canvas) {
+    canvas: FlowCanvas;
+    isPlaying: boolean;
+    speed: number;
+    globalSpawnRate: number;
+    lastTime: number;
+    eventTimers: Map<string, EventTimer>;
+    animationFrame: number | null;
+
+    constructor(canvas: FlowCanvas) {
         this.canvas = canvas;
         this.isPlaying = false;
         this.speed = 1;
-        this.globalSpawnRate = 2; // Fallback events per second
+        this.globalSpawnRate = 2;
         this.lastTime = 0;
-        this.eventTimers = new Map(); // Per-event spawn timers
+        this.eventTimers = new Map();
         this.animationFrame = null;
     }
 
     /**
      * Start the animation
      */
-    play() {
+    play(): void {
         if (this.isPlaying) return;
 
         this.isPlaying = true;
@@ -31,7 +42,7 @@ export class AnimationEngine {
     /**
      * Initialize timers for each event type
      */
-    initEventTimers() {
+    initEventTimers(): void {
         this.eventTimers.clear();
 
         const topology = this.canvas.topology;
@@ -41,7 +52,6 @@ export class AnimationEngine {
             const rate = event.rate || this.globalSpawnRate;
             this.eventTimers.set(event.name, {
                 event,
-                // Start with timer full so first event spawns immediately
                 timeSinceLastSpawn: 1000 / rate
             });
         }
@@ -50,7 +60,7 @@ export class AnimationEngine {
     /**
      * Pause the animation
      */
-    pause() {
+    pause(): void {
         this.isPlaying = false;
         if (this.animationFrame) {
             cancelAnimationFrame(this.animationFrame);
@@ -60,9 +70,8 @@ export class AnimationEngine {
 
     /**
      * Toggle play/pause
-     * @returns {boolean} - New playing state
      */
-    toggle() {
+    toggle(): boolean {
         if (this.isPlaying) {
             this.pause();
         } else {
@@ -73,64 +82,52 @@ export class AnimationEngine {
 
     /**
      * Set animation speed
-     * @param {number} speed - Speed multiplier (0.25 - 4)
      */
-    setSpeed(speed) {
+    setSpeed(speed: number): void {
         this.speed = Math.max(0.25, Math.min(4, speed));
     }
 
     /**
      * Set global event spawn rate (fallback)
-     * @param {number} rate - Events per second
      */
-    setSpawnRate(rate) {
+    setSpawnRate(rate: number): void {
         this.globalSpawnRate = Math.max(0.5, Math.min(5, rate));
     }
 
     /**
      * Main animation loop
      */
-    loop() {
+    loop(): void {
         if (!this.isPlaying) return;
 
         const currentTime = performance.now();
         const deltaTime = currentTime - this.lastTime;
         this.lastTime = currentTime;
 
-        // Update particles
         this.canvas.updateParticles(deltaTime, this.speed);
-
-        // Spawn new events based on their individual rates
         this.updateEventSpawning(deltaTime);
-
-        // Render
         this.canvas.render();
 
-        // Continue loop
         this.animationFrame = requestAnimationFrame(() => this.loop());
     }
 
     /**
      * Update event spawning based on per-event rates
      */
-    updateEventSpawning(deltaTime) {
+    updateEventSpawning(deltaTime: number): void {
         const topology = this.canvas.topology;
         if (!topology || topology.events.length === 0) return;
 
         const sourceNodes = this.canvas.getSourceNodes();
-        // Scale time by speed so spawning matches particle movement
         const scaledDeltaTime = deltaTime * this.speed;
 
-        for (const [eventName, timer] of this.eventTimers) {
+        for (const [_eventName, timer] of this.eventTimers) {
             const event = timer.event;
             const rate = event.rate || this.globalSpawnRate;
-            // Rate = events per second. Interval = 1000ms / rate
             const spawnInterval = 1000 / rate;
 
             timer.timeSinceLastSpawn += scaledDeltaTime;
 
-            // Use while loop to catch up if we missed frames, 
-            // but limit to preventing infinite loops/explosions on huge lag
             let spawnCount = 0;
             while (timer.timeSinceLastSpawn >= spawnInterval && spawnCount < 5) {
                 this.spawnEvent(event, sourceNodes);
@@ -138,7 +135,6 @@ export class AnimationEngine {
                 spawnCount++;
             }
 
-            // If we are still way behind (lag spike), just reset to avoid mega-burst
             if (timer.timeSinceLastSpawn > spawnInterval) {
                 timer.timeSinceLastSpawn = 0;
             }
@@ -147,32 +143,24 @@ export class AnimationEngine {
 
     /**
      * Spawn a specific event
-     * @param {Object} event - Event definition
-     * @param {Array} sourceNodes - Available source nodes
      */
-    spawnEvent(event, sourceNodes) {
+    spawnEvent(event: FlowEvent, sourceNodes: string[]): void {
         if (sourceNodes.length === 0) return;
 
-        // Determine which source node to use
-        let sourceNode;
+        let sourceNode: string;
 
         if (event.source) {
-            // Use specified source if it exists and is a valid source
             if (sourceNodes.includes(event.source)) {
                 sourceNode = event.source;
             } else {
-                // If specified source exists but isn't a true source (has incoming edges),
-                // still allow spawning from it
                 const nodeExists = this.canvas.layoutNodes.has(event.source);
                 if (nodeExists) {
                     sourceNode = event.source;
                 } else {
-                    // Fallback to random source
                     sourceNode = sourceNodes[Math.floor(Math.random() * sourceNodes.length)];
                 }
             }
         } else {
-            // Random source node
             sourceNode = sourceNodes[Math.floor(Math.random() * sourceNodes.length)];
         }
 
@@ -181,16 +169,14 @@ export class AnimationEngine {
 
     /**
      * Spawn a random event (for GIF export and other uses)
-     * No parameters needed - picks random event and source
      */
-    spawnRandomEvent() {
+    spawnRandomEvent(): void {
         const topology = this.canvas.topology;
-        if (!topology || !topology.events || topology.events.length === 0) return;
+        if (!topology?.events || topology.events.length === 0) return;
 
         const sourceNodes = this.canvas.getSourceNodes();
         if (sourceNodes.length === 0) return;
 
-        // Pick a random event type
         const event = topology.events[Math.floor(Math.random() * topology.events.length)];
         this.spawnEvent(event, sourceNodes);
     }
@@ -198,7 +184,7 @@ export class AnimationEngine {
     /**
      * Stop animation and clear all particles
      */
-    stop() {
+    stop(): void {
         this.pause();
         this.canvas.clearParticles();
         this.canvas.render();
@@ -208,7 +194,7 @@ export class AnimationEngine {
     /**
      * Reset without stopping
      */
-    reset() {
+    reset(): void {
         this.canvas.clearParticles();
         this.initEventTimers();
     }

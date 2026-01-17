@@ -9,8 +9,10 @@
  * - external: Cloud shape
  */
 
+import type { NodeType, NodeColors, NodeSize, Side, Point, LayoutNode } from '../types';
+
 // Node colors by type
-const NODE_COLORS = {
+const NODE_COLORS: Record<NodeType, NodeColors> = {
     service: { fill: '#6366f1', stroke: '#4f46e5', text: '#ffffff' },
     topic: { fill: '#06b6d4', stroke: '#0891b2', text: '#ffffff' },
     db: { fill: '#8b5cf6', stroke: '#7c3aed', text: '#ffffff' },
@@ -19,7 +21,7 @@ const NODE_COLORS = {
 };
 
 // Node dimensions
-const NODE_SIZE = {
+const NODE_SIZE: Record<NodeType, NodeSize> = {
     service: { width: 120, height: 50 },
     topic: { width: 140, height: 40 },
     db: { width: 80, height: 70 },
@@ -29,29 +31,22 @@ const NODE_SIZE = {
 
 /**
  * Get node dimensions for a type
- * @param {string} type - Node type
- * @returns {{ width: number, height: number }}
  */
-export function getNodeSize(type) {
+export function getNodeSize(type: NodeType): NodeSize {
     return NODE_SIZE[type] || NODE_SIZE.service;
 }
 
 /**
  * Get node colors for a type
- * @param {string} type - Node type
- * @returns {{ fill: string, stroke: string, text: string }}
  */
-export function getNodeColors(type) {
+export function getNodeColors(type: NodeType): NodeColors {
     return NODE_COLORS[type] || NODE_COLORS.service;
 }
 
 /**
  * Draw a node on the canvas
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {Object} node - Node object with id, type, x, y, attributes
- * @param {boolean} detailed - Whether to show detailed info
  */
-export function drawNode(ctx, node) {
+export function drawNode(ctx: CanvasRenderingContext2D, node: LayoutNode): void {
     const { type, x, y, id, attributes } = node;
     const size = getNodeSize(type);
     const colors = getNodeColors(type);
@@ -84,7 +79,14 @@ export function drawNode(ctx, node) {
 /**
  * Draw a service node (rounded rectangle)
  */
-function drawService(ctx, x, y, size, colors, label) {
+function drawService(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: NodeSize,
+    colors: NodeColors,
+    label: string
+): void {
     const { width, height } = size;
     const radius = 8;
 
@@ -112,7 +114,15 @@ function drawService(ctx, x, y, size, colors, label) {
 /**
  * Draw a topic node (horizontal pipe)
  */
-function drawTopic(ctx, x, y, size, colors, label, partitions) {
+function drawTopic(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: NodeSize,
+    colors: NodeColors,
+    label: string,
+    partitions?: number
+): void {
     const { width, height } = size;
     const capWidth = 12;
     const bodyWidth = width - capWidth * 2;
@@ -183,7 +193,14 @@ function drawTopic(ctx, x, y, size, colors, label, partitions) {
 /**
  * Draw a database node (vertical cylinder)
  */
-function drawDatabase(ctx, x, y, size, colors, label) {
+function drawDatabase(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: NodeSize,
+    colors: NodeColors,
+    label: string
+): void {
     const { width, height } = size;
     const capHeight = 12;
     const bodyHeight = height - capHeight;
@@ -237,7 +254,14 @@ function drawDatabase(ctx, x, y, size, colors, label) {
 /**
  * Draw a processor node (hexagon)
  */
-function drawProcessor(ctx, x, y, size, colors, label) {
+function drawProcessor(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: NodeSize,
+    colors: NodeColors,
+    label: string
+): void {
     const { width, height } = size;
     const sideWidth = width * 0.2;
 
@@ -272,7 +296,14 @@ function drawProcessor(ctx, x, y, size, colors, label) {
 /**
  * Draw an external system node (cloud-like shape)
  */
-function drawExternal(ctx, x, y, size, colors, label) {
+function drawExternal(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    size: NodeSize,
+    colors: NodeColors,
+    label: string
+): void {
     const { width, height } = size;
 
     // Shadow
@@ -305,7 +336,13 @@ function drawExternal(ctx, x, y, size, colors, label) {
 /**
  * Draw a label centered at position
  */
-function drawLabel(ctx, x, y, text, color) {
+function drawLabel(
+    ctx: CanvasRenderingContext2D,
+    x: number,
+    y: number,
+    text: string,
+    color: string
+): void {
     ctx.font = '500 12px Inter, sans-serif';
     ctx.fillStyle = color;
     ctx.textAlign = 'center';
@@ -326,11 +363,8 @@ function drawLabel(ctx, x, y, text, color) {
 
 /**
  * Get the connection point on a node's edge
- * @param {Object} node - Node with x, y, type
- * @param {string} side - 'left', 'right', 'top', 'bottom'
- * @returns {{ x: number, y: number }}
  */
-export function getConnectionPoint(node, side) {
+export function getConnectionPoint(node: LayoutNode, side: Side): Point {
     const size = getNodeSize(node.type);
 
     switch (side) {

@@ -4,22 +4,56 @@
  * Handles canvas setup, layout calculation, rendering, and pan/zoom.
  */
 
-import { drawNode, getNodeSize, getConnectionPoint } from './nodes.js';
-import { drawEdge, getEdgePath, getBezierPoint } from './edges.js';
+import { drawNode, getNodeSize, getConnectionPoint } from './nodes';
+import { drawEdge, getEdgePath, getBezierPoint } from './edges';
+import type {
+    Topology,
+    LayoutNode,
+    LayoutEdge,
+    Particle,
+    DelayedParticle,
+    FlowEvent,
+    EventShape,
+    Point,
+    BezierPath,
+    Side,
+} from '../types';
 
 /**
  * Canvas controller class
  */
 export class FlowCanvas {
-    constructor(canvasElement) {
-        this.canvas = canvasElement;
-        this.ctx = canvasElement.getContext('2d');
-        this.topology = null;
-        this.layoutNodes = new Map(); // Node positions (in world coordinates)
-        this.layoutEdges = []; // Edge paths
+    canvas: HTMLCanvasElement;
+    ctx: CanvasRenderingContext2D;
+    topology: Topology | null;
+    layoutNodes: Map<string, LayoutNode>;
+    layoutEdges: LayoutEdge[];
 
-        this.particles = []; // Event particles
-        this.delayedParticles = []; // Particles waiting at nodes
+    particles: Particle[];
+    delayedParticles: DelayedParticle[];
+
+    // Pan and zoom state
+    zoom: number;
+    panX: number;
+    panY: number;
+    isPanning: boolean;
+    lastMouseX: number;
+    lastMouseY: number;
+    minZoom: number;
+    maxZoom: number;
+
+    width: number;
+    height: number;
+
+    constructor(canvasElement: HTMLCanvasElement) {
+        this.canvas = canvasElement;
+        this.ctx = canvasElement.getContext('2d')!;
+        this.topology = null;
+        this.layoutNodes = new Map();
+        this.layoutEdges = [];
+
+        this.particles = [];
+        this.delayedParticles = [];
 
         // Pan and zoom state
         this.zoom = 1;
@@ -31,6 +65,9 @@ export class FlowCanvas {
         this.minZoom = 0.25;
         this.maxZoom = 3;
 
+        this.width = 0;
+        this.height = 0;
+
         this.setupCanvas();
         this.setupPanZoom();
         window.addEventListener('resize', () => this.setupCanvas());
@@ -39,9 +76,9 @@ export class FlowCanvas {
     /**
      * Set up pan and zoom controls
      */
-    setupPanZoom() {
+    setupPanZoom(): void {
         // Mouse wheel for zoom
-        this.canvas.addEventListener('wheel', (e) => {
+        this.canvas.addEventListener('wheel', (e: WheelEvent) => {
             e.preventDefault();
 
             const rect = this.canvas.getBoundingClientRect();
@@ -62,8 +99,8 @@ export class FlowCanvas {
         }, { passive: false });
 
         // Mouse drag for pan
-        this.canvas.addEventListener('mousedown', (e) => {
-            if (e.button === 0) { // Left click
+        this.canvas.addEventListener('mousedown', (e: MouseEvent) => {
+            if (e.button === 0) {
                 this.isPanning = true;
                 this.lastMouseX = e.clientX;
                 this.lastMouseY = e.clientY;
@@ -71,7 +108,7 @@ export class FlowCanvas {
             }
         });
 
-        this.canvas.addEventListener('mousemove', (e) => {
+        this.canvas.addEventListener('mousemove', (e: MouseEvent) => {
             if (this.isPanning) {
                 const deltaX = e.clientX - this.lastMouseX;
                 const deltaY = e.clientY - this.lastMouseY;
@@ -96,14 +133,13 @@ export class FlowCanvas {
             this.canvas.style.cursor = 'grab';
         });
 
-        // Set initial cursor
         this.canvas.style.cursor = 'grab';
     }
 
     /**
      * Reset view to fit all nodes
      */
-    resetView() {
+    resetView(): void {
         if (!this.topology || this.topology.nodes.length === 0) {
             this.zoom = 1;
             this.panX = 0;
@@ -111,7 +147,6 @@ export class FlowCanvas {
             return;
         }
 
-        // Calculate bounds of all nodes
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
         for (const node of this.layoutNodes.values()) {
@@ -126,12 +161,10 @@ export class FlowCanvas {
         const contentHeight = maxY - minY;
         const padding = 60;
 
-        // Calculate zoom to fit content
         const zoomX = (this.width - padding * 2) / contentWidth;
         const zoomY = (this.height - padding * 2) / contentHeight;
         this.zoom = Math.min(1, Math.min(zoomX, zoomY));
 
-        // Center the content
         const centerX = (minX + maxX) / 2;
         const centerY = (minY + maxY) / 2;
         this.panX = this.width / 2 - centerX * this.zoom;
@@ -143,8 +176,10 @@ export class FlowCanvas {
     /**
      * Set up canvas dimensions for high DPI displays
      */
-    setupCanvas() {
+    setupCanvas(): void {
         const parent = this.canvas.parentElement;
+        if (!parent) return;
+
         const rect = parent.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
 
@@ -157,7 +192,6 @@ export class FlowCanvas {
         this.width = rect.width;
         this.height = rect.height;
 
-        // Re-render if we have a topology
         if (this.topology) {
             this.calculateLayout();
             this.render();
@@ -166,21 +200,17 @@ export class FlowCanvas {
 
     /**
      * Set the topology to render
-     * @param {Object} topology - Parsed topology { nodes, edges, events }
      */
-    setTopology(topology) {
+    setTopology(topology: Topology): void {
         this.topology = topology;
         this.calculateLayout();
-        this.resetView(); // Auto-fit new topology
+        this.resetView();
     }
-
-
 
     /**
      * Calculate node positions using a simple left-to-right layout
-     * Now uses world coordinates (not screen coordinates)
      */
-    calculateLayout() {
+    calculateLayout(): void {
         if (!this.topology || this.topology.nodes.length === 0) {
             this.layoutNodes.clear();
             this.layoutEdges = [];
@@ -191,8 +221,8 @@ export class FlowCanvas {
         const edges = this.topology.edges;
 
         // Build adjacency lists
-        const outgoing = new Map();
-        const incoming = new Map();
+        const outgoing = new Map<string, string[]>();
+        const incoming = new Map<string, string[]>();
 
         for (const node of nodes) {
             outgoing.set(node.id, []);
@@ -201,16 +231,16 @@ export class FlowCanvas {
 
         for (const edge of edges) {
             if (outgoing.has(edge.from) && incoming.has(edge.to)) {
-                outgoing.get(edge.from).push(edge.to);
-                incoming.get(edge.to).push(edge.from);
+                outgoing.get(edge.from)!.push(edge.to);
+                incoming.get(edge.to)!.push(edge.from);
             }
         }
 
-        // Assign levels (columns) using topological sort
-        const levels = new Map();
-        const visited = new Set();
+        // Assign levels using topological sort
+        const levels = new Map<string, number>();
+        const visited = new Set<string>();
 
-        const assignLevel = (nodeId, level) => {
+        const assignLevel = (nodeId: string, level: number): void => {
             if (visited.has(nodeId)) {
                 levels.set(nodeId, Math.max(levels.get(nodeId) || 0, level));
                 return;
@@ -223,8 +253,8 @@ export class FlowCanvas {
             }
         };
 
-        // Start from nodes with no incoming edges (sources)
-        const sources = nodes.filter(n => incoming.get(n.id).length === 0);
+        // Start from source nodes
+        const sources = nodes.filter(n => incoming.get(n.id)!.length === 0);
         if (sources.length === 0 && nodes.length > 0) {
             assignLevel(nodes[0].id, 0);
         }
@@ -232,24 +262,23 @@ export class FlowCanvas {
             assignLevel(source.id, 0);
         }
 
-        // Make sure all nodes are visited
+        // Ensure all nodes visited
         for (const node of nodes) {
             if (!visited.has(node.id)) {
                 assignLevel(node.id, 0);
             }
         }
 
-        // Group nodes by level
-        const levelGroups = new Map();
+        // Group by level
+        const levelGroups = new Map<number, string[]>();
         for (const [nodeId, level] of levels) {
             if (!levelGroups.has(level)) {
                 levelGroups.set(level, []);
             }
-            levelGroups.get(level).push(nodeId);
+            levelGroups.get(level)!.push(nodeId);
         }
 
-        // Calculate positions in world coordinates with fixed spacing
-        const maxLevel = Math.max(...levels.values());
+        // Calculate positions
         const horizontalSpacing = 220;
         const verticalSpacing = 120;
 
@@ -258,39 +287,30 @@ export class FlowCanvas {
         for (const [level, nodeIds] of levelGroups) {
             const nodeCount = nodeIds.length;
             const totalHeight = (nodeCount - 1) * verticalSpacing;
-            const startY = -totalHeight / 2; // Center around y=0
+            const startY = -totalHeight / 2;
 
             nodeIds.forEach((nodeId, index) => {
-                const node = nodes.find(n => n.id === nodeId);
+                const node = nodes.find(n => n.id === nodeId)!;
                 let x = level * horizontalSpacing;
                 let y = nodeCount === 1 ? 0 : startY + index * verticalSpacing;
 
-                // Override with manual coordinates if provided
+                // Override with manual coordinates
                 if (node.attributes) {
-                    if (typeof node.attributes.x === 'number') {
-                        x = node.attributes.x;
-                    }
-                    if (typeof node.attributes.y === 'number') {
-                        y = node.attributes.y;
-                    }
+                    if (typeof node.attributes.x === 'number') x = node.attributes.x;
+                    if (typeof node.attributes.y === 'number') y = node.attributes.y;
                 }
 
-                this.layoutNodes.set(nodeId, {
-                    ...node,
-                    x,
-                    y
-                });
+                this.layoutNodes.set(nodeId, { ...node, x, y });
             });
         }
 
-        // Calculate edge paths (in world coordinates)
+        // Calculate edge paths
         this.layoutEdges = edges.map(edge => {
             const fromNode = this.layoutNodes.get(edge.from);
             const toNode = this.layoutNodes.get(edge.to);
 
             if (!fromNode || !toNode) return null;
 
-            // Use specified sides or defaults
             const fromSide = edge.fromSide || 'right';
             const toSide = edge.toSide || 'left';
             const fromPoint = getConnectionPoint(fromNode, fromSide);
@@ -298,20 +318,14 @@ export class FlowCanvas {
 
             const path = getEdgePath(fromPoint, toPoint, 0, fromSide, toSide);
 
-            return {
-                from: edge.from,
-                to: edge.to,
-                fromPoint,
-                toPoint,
-                path
-            };
-        }).filter(Boolean);
+            return { from: edge.from, to: edge.to, fromPoint, toPoint, path };
+        }).filter((e): e is LayoutEdge => e !== null);
     }
 
     /**
      * Transform world coordinates to screen coordinates
      */
-    worldToScreen(x, y) {
+    worldToScreen(x: number, y: number): Point {
         return {
             x: x * this.zoom + this.panX,
             y: y * this.zoom + this.panY
@@ -321,10 +335,9 @@ export class FlowCanvas {
     /**
      * Render the canvas
      */
-    render() {
+    render(): void {
         const ctx = this.ctx;
 
-        // Clear canvas
         ctx.fillStyle = '#f8fafc';
         ctx.fillRect(0, 0, this.width, this.height);
 
@@ -333,43 +346,32 @@ export class FlowCanvas {
             return;
         }
 
-        // Save context and apply transform
         ctx.save();
         ctx.translate(this.panX, this.panY);
         ctx.scale(this.zoom, this.zoom);
 
-        // Draw grid (subtle)
         this.drawGrid();
-
-        // Draw subsystems (containers) first, behind everything
         this.drawSubsystems();
 
-        // Draw edges
         for (const edge of this.layoutEdges) {
             drawEdge(ctx, edge.path, false);
         }
 
-        // Draw particles (events)
         this.drawParticles();
-
-        // Draw delayed particles (pulsing at nodes)
         this.drawDelayedParticles();
 
-        // Draw nodes
         for (const node of this.layoutNodes.values()) {
             drawNode(ctx, node);
         }
 
         ctx.restore();
-
-        // Draw zoom indicator (not affected by transform)
         this.drawZoomIndicator();
     }
 
     /**
      * Draw zoom level indicator
      */
-    drawZoomIndicator() {
+    drawZoomIndicator(): void {
         const ctx = this.ctx;
         const zoomPercent = Math.round(this.zoom * 100);
 
@@ -379,29 +381,26 @@ export class FlowCanvas {
         ctx.textBaseline = 'bottom';
         ctx.fillText(`${zoomPercent}%`, this.width - 12, this.height - 12);
 
-        // Draw mini hint
         ctx.font = '10px Inter, sans-serif';
         ctx.fillStyle = '#94a3b8';
         ctx.fillText('Scroll to zoom • Drag to pan', this.width - 12, this.height - 26);
     }
 
     /**
-     * Draw subtle background grid (in world coordinates)
+     * Draw subtle background grid
      */
-    drawGrid() {
+    drawGrid(): void {
         const ctx = this.ctx;
         const gridSize = 50;
 
-        // Calculate visible area in world coordinates
         const startX = Math.floor(-this.panX / this.zoom / gridSize) * gridSize - gridSize;
         const startY = Math.floor(-this.panY / this.zoom / gridSize) * gridSize - gridSize;
         const endX = startX + (this.width / this.zoom) + gridSize * 2;
         const endY = startY + (this.height / this.zoom) + gridSize * 2;
 
         ctx.strokeStyle = '#e2e8f0';
-        ctx.lineWidth = 1 / this.zoom; // Keep consistent line width
+        ctx.lineWidth = 1 / this.zoom;
 
-        // Vertical lines
         for (let x = startX; x < endX; x += gridSize) {
             ctx.beginPath();
             ctx.moveTo(x, startY);
@@ -409,7 +408,6 @@ export class FlowCanvas {
             ctx.stroke();
         }
 
-        // Horizontal lines
         for (let y = startY; y < endY; y += gridSize) {
             ctx.beginPath();
             ctx.moveTo(startX, y);
@@ -421,28 +419,21 @@ export class FlowCanvas {
     /**
      * Draw subsystem containers
      */
-    drawSubsystems() {
-        if (!this.topology || !this.topology.subsystems) return;
+    drawSubsystems(): void {
+        if (!this.topology?.subsystems) return;
 
         const ctx = this.ctx;
         const padding = 30;
         const cornerRadius = 12;
         const labelHeight = 24;
 
-        // Default colors for subsystems
         const defaultColors = [
-            '#6366f1', // Indigo
-            '#10b981', // Emerald
-            '#f59e0b', // Amber
-            '#ef4444', // Red
-            '#8b5cf6', // Violet
-            '#06b6d4', // Cyan
+            '#6366f1', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'
         ];
 
         this.topology.subsystems.forEach((subsystem, index) => {
             if (subsystem.nodes.length === 0) return;
 
-            // Calculate bounds of all nodes in this subsystem
             let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
             for (const nodeId of subsystem.nodes) {
@@ -456,9 +447,8 @@ export class FlowCanvas {
                 maxY = Math.max(maxY, node.y + size.height / 2);
             }
 
-            if (minX === Infinity) return; // No valid nodes
+            if (minX === Infinity) return;
 
-            // Add padding around the bounds
             minX -= padding;
             minY -= padding + labelHeight;
             maxX += padding;
@@ -466,11 +456,8 @@ export class FlowCanvas {
 
             const width = maxX - minX;
             const height = maxY - minY;
-
-            // Get color for this subsystem
             const color = subsystem.color || defaultColors[index % defaultColors.length];
 
-            // Draw container background
             ctx.save();
             ctx.globalAlpha = 0.08;
             ctx.fillStyle = color;
@@ -479,7 +466,6 @@ export class FlowCanvas {
             ctx.fill();
             ctx.restore();
 
-            // Draw container border
             ctx.strokeStyle = color;
             ctx.lineWidth = 2;
             ctx.setLineDash([5, 5]);
@@ -488,14 +474,12 @@ export class FlowCanvas {
             ctx.stroke();
             ctx.setLineDash([]);
 
-            // Draw label background
             ctx.fillStyle = color;
             const labelWidth = ctx.measureText(subsystem.name).width + 16;
             ctx.beginPath();
             ctx.roundRect(minX + 10, minY + 8, labelWidth + 8, labelHeight, 6);
             ctx.fill();
 
-            // Draw label text
             ctx.font = '600 13px Inter, sans-serif';
             ctx.fillStyle = '#ffffff';
             ctx.textAlign = 'left';
@@ -507,9 +491,8 @@ export class FlowCanvas {
     /**
      * Draw empty state message
      */
-    drawEmptyState() {
+    drawEmptyState(): void {
         const ctx = this.ctx;
-
         ctx.font = '500 16px Inter, sans-serif';
         ctx.fillStyle = '#94a3b8';
         ctx.textAlign = 'center';
@@ -519,26 +502,19 @@ export class FlowCanvas {
 
     /**
      * Add a particle (event) to animate
-     * @param {Object} event - Event definition { name, color, shape }
-     * @param {string} startNodeId - Starting node ID
      */
-    addParticle(event, startNodeId) {
-        let edge;
+    addParticle(event: FlowEvent, startNodeId: string): Particle | null {
+        let edge: LayoutEdge | undefined;
         let pathIndex = 0;
 
-        // If event has a defined path
         if (event.path && event.path.length > 1) {
-            // Check if startNodeId matches the start of the path
             if (event.path[0].nodeId === startNodeId) {
                 const nextNodeId = event.path[1].nodeId;
                 edge = this.layoutEdges.find(e => e.from === startNodeId && e.to === nextNodeId);
-                // If specific edge not found, fallback to any edge
                 if (!edge) {
                     edge = this.layoutEdges.find(e => e.from === startNodeId);
                 }
             } else {
-                // Start node is not the start of path, maybe a random source?
-                // Try to follow path if we are on it
                 const index = event.path.findIndex(p => p.nodeId === startNodeId);
                 if (index >= 0 && index < event.path.length - 1) {
                     pathIndex = index;
@@ -548,19 +524,18 @@ export class FlowCanvas {
             }
         }
 
-        // Fallback to default behavior (first outgoing edge)
         if (!edge) {
             edge = this.layoutEdges.find(e => e.from === startNodeId);
         }
 
         if (!edge) return null;
 
-        const particle = {
+        const particle: Particle = {
             id: Math.random().toString(36).substr(2, 9),
             event: { ...event },
             originalEvent: event,
             currentEdgeIndex: this.layoutEdges.indexOf(edge),
-            pathIndex: pathIndex,
+            pathIndex,
             progress: 0,
             x: edge.fromPoint.x,
             y: edge.fromPoint.y
@@ -572,27 +547,27 @@ export class FlowCanvas {
 
     /**
      * Update particle positions
-     * @param {number} deltaTime - Time since last update in ms
-     * @param {number} speed - Animation speed multiplier
-     * @returns {Array} - Particles that reached the end
      */
-    updateParticles(deltaTime, speed = 1) {
+    updateParticles(deltaTime: number, speed: number = 1): Particle[] {
         const baseSpeed = 0.0008;
-        const completedParticles = [];
+        const completedParticles: Particle[] = [];
 
-        // Helper to find next edge based on path or random
-        const getNextEdge = (currentParticle, nodeId) => {
+        const getNextEdge = (currentParticle: Particle, nodeId: string): LayoutEdge | null => {
             if (currentParticle.event.path && currentParticle.event.path.length > 0) {
                 const currentPathIndex = currentParticle.pathIndex;
-                // Verify we are where we think we are
-                if (currentParticle.event.path[currentPathIndex + 1].nodeId === nodeId) {
-                    // We just arrived at path[currentPathIndex + 1]
-                    const step = currentParticle.event.path[currentPathIndex + 1];
+                const nextPathStep = currentParticle.event.path[currentPathIndex + 1];
+
+                if (nextPathStep && nextPathStep.nodeId === nodeId) {
+                    const step = nextPathStep;
                     if (step.attributes) {
-                        if (step.attributes.shape) currentParticle.event.shape = step.attributes.shape;
-                        if (step.attributes.color) currentParticle.event.color = step.attributes.color;
+                        if (step.attributes.shape) {
+                            currentParticle.event.shape = step.attributes.shape as EventShape;
+                        }
+                        if (step.attributes.color) {
+                            currentParticle.event.color = step.attributes.color;
+                        }
                     }
-                    // Next target is path[currentPathIndex + 2]
+
                     if (currentPathIndex + 2 < currentParticle.event.path.length) {
                         const nextTarget = currentParticle.event.path[currentPathIndex + 2].nodeId;
                         const edge = this.layoutEdges.find(e => e.from === nodeId && e.to === nextTarget);
@@ -602,14 +577,16 @@ export class FlowCanvas {
                         }
                     }
                 } else {
-                    // We might have drifted or started mid-path?
-                    // Try to recover
                     const index = currentParticle.event.path.findIndex(p => p.nodeId === nodeId);
                     if (index >= 0 && index < currentParticle.event.path.length - 1) {
                         const step = currentParticle.event.path[index];
                         if (step.attributes) {
-                            if (step.attributes.shape) currentParticle.event.shape = step.attributes.shape;
-                            if (step.attributes.color) currentParticle.event.color = step.attributes.color;
+                            if (step.attributes.shape) {
+                                currentParticle.event.shape = step.attributes.shape as EventShape;
+                            }
+                            if (step.attributes.color) {
+                                currentParticle.event.color = step.attributes.color;
+                            }
                         }
                         const nextTarget = currentParticle.event.path[index + 1].nodeId;
                         const edge = this.layoutEdges.find(e => e.from === nodeId && e.to === nextTarget);
@@ -621,7 +598,6 @@ export class FlowCanvas {
                 }
             }
 
-            // Default: pick a random outgoing edge
             const outgoingEdges = this.layoutEdges.filter(e => e.from === nodeId);
             if (outgoingEdges.length > 0) {
                 return outgoingEdges[Math.floor(Math.random() * outgoingEdges.length)];
@@ -636,7 +612,7 @@ export class FlowCanvas {
 
             if (delayed.remainingDelay <= 0) {
                 const node = this.layoutNodes.get(delayed.atNodeId);
-                if (node && node.attributes) {
+                if (node?.attributes) {
                     if (node.attributes.transform) {
                         delayed.particle.event.shape = node.attributes.transform;
                     }
@@ -672,13 +648,7 @@ export class FlowCanvas {
             particle.progress += baseSpeed * deltaTime * speed;
 
             const { path } = edge;
-            const pos = getBezierPoint(
-                path.start,
-                path.cp1,
-                path.cp2,
-                path.end,
-                Math.min(particle.progress, 1)
-            );
+            const pos = getBezierPoint(path.start, path.cp1, path.cp2, path.end, Math.min(particle.progress, 1));
             particle.x = pos.x;
             particle.y = pos.y;
 
@@ -696,7 +666,7 @@ export class FlowCanvas {
                         totalDelay: delay
                     });
                 } else {
-                    if (targetNode && targetNode.attributes) {
+                    if (targetNode?.attributes) {
                         if (targetNode.attributes.transform) {
                             particle.event.shape = targetNode.attributes.transform;
                         }
@@ -724,7 +694,7 @@ export class FlowCanvas {
     /**
      * Draw all particles
      */
-    drawParticles() {
+    drawParticles(): void {
         const ctx = this.ctx;
         for (const particle of this.particles) {
             this.drawSingleParticle(ctx, particle.event, particle.x, particle.y);
@@ -734,7 +704,7 @@ export class FlowCanvas {
     /**
      * Draw delayed particles (pulsing at nodes)
      */
-    drawDelayedParticles() {
+    drawDelayedParticles(): void {
         const ctx = this.ctx;
 
         for (const delayed of this.delayedParticles) {
@@ -754,8 +724,13 @@ export class FlowCanvas {
     /**
      * Draw a single particle
      */
-    drawSingleParticle(ctx, event, x, y, scale = 1) {
-        // Base size is 10, multiplied by event size and animation scale
+    drawSingleParticle(
+        ctx: CanvasRenderingContext2D,
+        event: FlowEvent,
+        x: number,
+        y: number,
+        scale: number = 1
+    ): void {
         const eventSize = event.size || 1;
         const size = 10 * eventSize * scale;
 
@@ -792,21 +767,18 @@ export class FlowCanvas {
 
     /**
      * Get source nodes (nodes with no incoming edges)
-     * @returns {Array} Node IDs
      */
-    getSourceNodes() {
+    getSourceNodes(): string[] {
         if (!this.topology) return [];
 
         const hasIncoming = new Set(this.topology.edges.map(e => e.to));
-        return this.topology.nodes
-            .filter(n => !hasIncoming.has(n.id))
-            .map(n => n.id);
+        return this.topology.nodes.filter(n => !hasIncoming.has(n.id)).map(n => n.id);
     }
 
     /**
      * Clear all particles
      */
-    clearParticles() {
+    clearParticles(): void {
         this.particles = [];
         this.delayedParticles = [];
     }

@@ -5,19 +5,21 @@
  * Handles forward, backward, and complex routing.
  */
 
+import type { Point, BezierPath, Side } from '../types';
+
 const EDGE_COLOR = '#94a3b8';
 const EDGE_ACTIVE_COLOR = '#6366f1';
-const ARROW_SIZE = 12; // Increased from 8
-const NODE_GAP = 8;    // Gap between arrow tip and node
+const ARROW_SIZE = 12;
+const NODE_GAP = 8;
 
 /**
  * Draw an edge between two nodes
- * Draw an edge
- * @param {CanvasRenderingContext2D} ctx - Canvas context
- * @param {Object} path - Pre-calculated path object
- * @param {boolean} active - Whether the edge is active
  */
-export function drawEdge(ctx, path, active = false) {
+export function drawEdge(
+    ctx: CanvasRenderingContext2D,
+    path: BezierPath,
+    active: boolean = false
+): void {
     ctx.save();
 
     const color = active ? EDGE_ACTIVE_COLOR : EDGE_COLOR;
@@ -29,7 +31,7 @@ export function drawEdge(ctx, path, active = false) {
 
     // Calculate start gap
     const startAngle = Math.atan2(path.cp1.y - path.start.y, path.cp1.x - path.start.x);
-    const lineStart = {
+    const lineStart: Point = {
         x: path.start.x + Math.cos(startAngle) * NODE_GAP,
         y: path.start.y + Math.sin(startAngle) * NODE_GAP
     };
@@ -38,13 +40,13 @@ export function drawEdge(ctx, path, active = false) {
     const endAngle = Math.atan2(path.end.y - path.cp2.y, path.end.x - path.cp2.x);
 
     // Calculate actual end point (retracted by gap)
-    const arrowTip = {
+    const arrowTip: Point = {
         x: path.end.x - Math.cos(endAngle) * NODE_GAP,
         y: path.end.y - Math.sin(endAngle) * NODE_GAP
     };
 
     // Calculate where the line should end
-    const lineEnd = {
+    const lineEnd: Point = {
         x: arrowTip.x - Math.cos(endAngle) * (ARROW_SIZE / 2),
         y: arrowTip.y - Math.sin(endAngle) * (ARROW_SIZE / 2)
     };
@@ -66,7 +68,12 @@ export function drawEdge(ctx, path, active = false) {
 /**
  * Draw an arrow head
  */
-function drawArrowHead(ctx, tip, angle, color) {
+function drawArrowHead(
+    ctx: CanvasRenderingContext2D,
+    tip: Point,
+    angle: number,
+    color: string
+): void {
     ctx.beginPath();
     ctx.moveTo(tip.x, tip.y);
     ctx.lineTo(
@@ -85,7 +92,7 @@ function drawArrowHead(ctx, tip, angle, color) {
 /**
  * Get a point along a bezier curve
  */
-export function getBezierPoint(p0, p1, p2, p3, t) {
+export function getBezierPoint(p0: Point, p1: Point, p2: Point, p3: Point, t: number): Point {
     const mt = 1 - t;
     const mt2 = mt * mt;
     const mt3 = mt2 * mt;
@@ -101,13 +108,19 @@ export function getBezierPoint(p0, p1, p2, p3, t) {
 /**
  * Calculate the path points for an edge
  */
-export function getEdgePath(from, to, offsetIndex = 0, fromSide = 'right', toSide = 'left') {
+export function getEdgePath(
+    from: Point,
+    to: Point,
+    offsetIndex: number = 0,
+    fromSide: Side = 'right',
+    toSide: Side = 'left'
+): BezierPath {
     const dx = to.x - from.x;
     const dy = to.y - from.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     // Direction vectors for sides
-    const getVector = (side) => {
+    const getVector = (side: Side): Point => {
         switch (side) {
             case 'left': return { x: -1, y: 0 };
             case 'right': return { x: 1, y: 0 };
@@ -121,21 +134,16 @@ export function getEdgePath(from, to, offsetIndex = 0, fromSide = 'right', toSid
     const endDir = getVector(toSide);
 
     // Calculate control point distance
-    // Use a base distance plus a factor of the actual distance
-    // Clamp it to avoid wild loops for close nodes
     let controlDist = Math.min(dist * 0.5, 150);
-
-    // Minimum control dist to ensure curve has room to leave node
     controlDist = Math.max(controlDist, 40);
 
     // If "Backward" (going against the grain), increase loop size
-    // e.g. Right -> Left connection but Target is to the Left of Source
     const isBackward = (fromSide === 'right' && toSide === 'left' && dx < -20);
     if (isBackward) {
         controlDist = Math.max(Math.abs(dy) * 0.5 + 50, 100);
     }
 
-    // Apply offset for parallel edges (simple perpendicular shift not implemented yet, using dist)
+    // Apply offset for parallel edges
     if (offsetIndex > 0) {
         controlDist += offsetIndex * 20;
     }
