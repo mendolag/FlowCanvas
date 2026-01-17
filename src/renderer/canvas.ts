@@ -756,6 +756,136 @@ export class FlowCanvas {
             case 'square':
                 ctx.fillRect(x - size / 2, y - size / 2, size, size);
                 break;
+            case 'diamond':
+                ctx.beginPath();
+                ctx.moveTo(x, y - size / 2);
+                ctx.lineTo(x + size / 2, y);
+                ctx.lineTo(x, y + size / 2);
+                ctx.lineTo(x - size / 2, y);
+                ctx.closePath();
+                ctx.fill();
+                break;
+            case 'message':
+                // Envelope shape
+                ctx.beginPath();
+                ctx.moveTo(x - size / 2, y - size / 3);
+                ctx.lineTo(x + size / 2, y - size / 3);
+                ctx.lineTo(x + size / 2, y + size / 3);
+                ctx.lineTo(x - size / 2, y + size / 3);
+                ctx.closePath();
+                ctx.fill();
+                // Flap
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x - size / 2, y - size / 3);
+                ctx.lineTo(x, y + size / 6);
+                ctx.lineTo(x + size / 2, y - size / 3);
+                ctx.stroke();
+                break;
+            case 'document':
+                // Document with folded corner
+                ctx.beginPath();
+                ctx.moveTo(x - size / 2, y - size / 2);
+                ctx.lineTo(x + size / 4, y - size / 2);
+                ctx.lineTo(x + size / 2, y - size / 4);
+                ctx.lineTo(x + size / 2, y + size / 2);
+                ctx.lineTo(x - size / 2, y + size / 2);
+                ctx.closePath();
+                ctx.fill();
+                // Fold
+                ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x + size / 4, y - size / 2);
+                ctx.lineTo(x + size / 4, y - size / 4);
+                ctx.lineTo(x + size / 2, y - size / 4);
+                ctx.stroke();
+                break;
+            case 'alert':
+                // Warning triangle
+                ctx.beginPath();
+                ctx.moveTo(x, y - size / 2);
+                ctx.lineTo(x + size / 2, y + size / 2.5);
+                ctx.lineTo(x - size / 2, y + size / 2.5);
+                ctx.closePath();
+                ctx.fill();
+                // Exclamation
+                ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                ctx.beginPath();
+                ctx.arc(x, y + size / 6, size / 10, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillRect(x - size / 14, y - size / 4, size / 7, size / 3);
+                break;
+            case 'lightning':
+                // Lightning bolt
+                ctx.beginPath();
+                ctx.moveTo(x + size / 6, y - size / 2);
+                ctx.lineTo(x - size / 6, y);
+                ctx.lineTo(x + size / 8, y);
+                ctx.lineTo(x - size / 6, y + size / 2);
+                ctx.lineTo(x + size / 6, y - size / 8);
+                ctx.lineTo(x - size / 8, y - size / 8);
+                ctx.closePath();
+                ctx.fill();
+                break;
+            case 'package':
+                // Box/cube shape
+                ctx.beginPath();
+                ctx.moveTo(x, y - size / 2);
+                ctx.lineTo(x + size / 2, y - size / 4);
+                ctx.lineTo(x + size / 2, y + size / 4);
+                ctx.lineTo(x, y + size / 2);
+                ctx.lineTo(x - size / 2, y + size / 4);
+                ctx.lineTo(x - size / 2, y - size / 4);
+                ctx.closePath();
+                ctx.fill();
+                // Lines
+                ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(x, y - size / 2);
+                ctx.lineTo(x, y);
+                ctx.lineTo(x + size / 2, y - size / 4);
+                ctx.moveTo(x, y);
+                ctx.lineTo(x - size / 2, y - size / 4);
+                ctx.stroke();
+                break;
+            case 'pulse':
+                // Heartbeat/activity shape
+                ctx.beginPath();
+                ctx.moveTo(x - size / 2, y);
+                ctx.lineTo(x - size / 4, y);
+                ctx.lineTo(x - size / 8, y - size / 3);
+                ctx.lineTo(x + size / 8, y + size / 3);
+                ctx.lineTo(x + size / 4, y);
+                ctx.lineTo(x + size / 2, y);
+                ctx.strokeStyle = event.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(x, y, size / 4, 0, Math.PI * 2);
+                ctx.fill();
+                break;
+            case 'key':
+                // Key icon
+                ctx.beginPath();
+                // Key head (circle with hole)
+                ctx.arc(x - size / 4, y, size / 3, 0, Math.PI * 2);
+                ctx.fill();
+                // Shaft
+                ctx.fillRect(x - size / 8, y - size / 8, size / 2, size / 4);
+                // Teeth
+                ctx.fillRect(x + size / 4, y, size / 8, size / 4);
+                ctx.fillRect(x + size / 8, y, size / 8, size / 5);
+                // Hole in head
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.arc(x - size / 4, y, size / 8, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                break;
             default:
                 ctx.beginPath();
                 ctx.arc(x, y, size / 2, 0, Math.PI * 2);

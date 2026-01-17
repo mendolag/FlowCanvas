@@ -5,8 +5,10 @@
 // Node types
 export type NodeType = 'service' | 'topic' | 'db' | 'processor' | 'external';
 
-// Event shapes
-export type EventShape = 'circle' | 'triangle' | 'square';
+// Event shapes (geometric + icon-based)
+export type EventShape =
+    | 'circle' | 'triangle' | 'square' | 'diamond'  // Geometric
+    | 'message' | 'document' | 'alert' | 'lightning' | 'package' | 'pulse' | 'key';  // Icon-based
 
 // Connection sides
 export type Side = 'left' | 'right' | 'top' | 'bottom';

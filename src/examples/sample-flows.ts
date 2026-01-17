@@ -6,7 +6,7 @@
 export type ExampleName = 'mapic' | 'ecommerce' | 'etl';
 
 export const EXAMPLES: Record<ExampleName, string> = {
-    mapic: `# MAPIC Mail Processing System
+  mapic: `# MAPIC Mail Processing System
 # External event sources (Manual Layout)
 sorting: topic, x=-200, y=-60
 nes: topic, x=-200, y=60
@@ -53,16 +53,16 @@ events:
     shape: triangle
     source: sorting
     rate: 2
-    path: sorting -> Normalizer[shape=circle, color=#3b82f6] -> identity -> KeyProvider[shape=circle, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#10b981] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState
+    path: sorting -> Normalizer[shape=circle, color=#3b82f6] -> identity -> KeyProvider[shape=key, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#10b981] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState
 
   - name: nes
     color: "#e11d48"
     shape: triangle
     source: nes
     rate: 0.3
-    path: nes -> Normalizer[shape=circle, color=#e11d48] -> identity -> KeyProvider[shape=circle, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#f59042] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState`,
+    path: nes -> Normalizer[shape=circle, color=#e11d48] -> identity -> KeyProvider[shape=key, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#f59042] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState`,
 
-    ecommerce: `# E-Commerce Order Processing with Subsystems
+  ecommerce: `# E-Commerce Order Processing with Subsystems
 
 # Frontend subsystem
 subsystem "Frontend":
@@ -71,9 +71,9 @@ subsystem "Frontend":
 
 # Backend subsystem  
 subsystem "Backend":
-  payment-service: service, delay=800, transform=square, transformColor=#10b981
+  payment-service: service, delay=800, transform=package, transformColor=#10b981
   inventory-service: service, delay=400
-  notification-service: service, delay=200, transform=triangle, transformColor=#f59e0b
+  notification-service: service, delay=200, transform=message, transformColor=#f59e0b
 
 # Kafka Topics (messaging layer)
 orders: topic, partitions=6
@@ -94,18 +94,24 @@ payment-service -> orders-db
 events:
   - name: order
     color: "#3b82f6"
-    shape: circle
+    shape: document
     size: medium
     source: web-gateway
     rate: 1.5
   - name: bulk-order
     color: "#8b5cf6"
-    shape: circle
+    shape: package
     size: large
     source: web-gateway
-    rate: 0.3`,
+    rate: 0.3
+  - name: alert-event
+    color: "#ef4444"
+    shape: alert
+    size: medium
+    source: web-gateway
+    rate: 0.2`,
 
-    etl: `# ETL Data Pipeline
+  etl: `# ETL Data Pipeline
 # Sources
 source-db: db
 file-ingestion: external
@@ -148,5 +154,5 @@ events:
  * Get an example by name
  */
 export function getExample(name: string): string {
-    return EXAMPLES[name as ExampleName] || EXAMPLES.mapic;
+  return EXAMPLES[name as ExampleName] || EXAMPLES.mapic;
 }

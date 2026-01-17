@@ -20,6 +20,7 @@ interface FlowContextType {
     setDsl: (dsl: string) => void;
     setTopology: (topology: Topology) => void;
     setErrors: (errors: ParseError[]) => void;
+    setIsPlaying: (playing: boolean) => void;
     togglePlayPause: () => void;
     setSpeed: (speed: number) => void;
     setSpawnRate: (rate: number) => void;
@@ -100,6 +101,7 @@ export function FlowProvider({ children }: FlowProviderProps) {
         setDsl,
         setTopology,
         setErrors,
+        setIsPlaying,
         togglePlayPause,
         setSpeed,
         setSpawnRate,

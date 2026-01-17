@@ -20,7 +20,10 @@ import type {
 } from '../types';
 
 const NODE_TYPES: readonly NodeType[] = ['service', 'topic', 'db', 'processor', 'external'];
-const EVENT_SHAPES: readonly EventShape[] = ['circle', 'triangle', 'square'];
+const EVENT_SHAPES: readonly EventShape[] = [
+    'circle', 'triangle', 'square', 'diamond',  // Geometric
+    'message', 'document', 'alert', 'lightning', 'package', 'pulse', 'key'  // Icon-based
+];
 const VALID_SIDES: readonly Side[] = ['top', 'bottom', 'left', 'right'];
 
 // Internal types for parsing state

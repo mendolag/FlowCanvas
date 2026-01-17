@@ -2,14 +2,15 @@
  * FlowCanvas Node Renderer
  * 
  * Renders different node shapes based on type:
- * - service: Rounded rectangle
- * - topic: Horizontal pipe (cylinder on side)
- * - db: Vertical cylinder
- * - processor: Hexagon
- * - external: Cloud shape
+ * - service: Rounded rectangle with server icon
+ * - topic: Horizontal pipe with message icon
+ * - db: Vertical cylinder with database icon
+ * - processor: Hexagon with cog icon
+ * - external: Cloud shape with cloud icon
  */
 
 import type { NodeType, NodeColors, NodeSize, Side, Point, LayoutNode } from '../types';
+import { drawIcon, getNodeIcon } from './icons';
 
 // Node colors by type
 const NODE_COLORS: Record<NodeType, NodeColors> = {
@@ -77,7 +78,7 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: LayoutNode): void 
 }
 
 /**
- * Draw a service node (rounded rectangle)
+ * Draw a service node (rounded rectangle with icon)
  */
 function drawService(
     ctx: CanvasRenderingContext2D,
@@ -107,8 +108,13 @@ function drawService(
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Label
-    drawLabel(ctx, x, y, label, colors.text);
+    // Icon on left side
+    const iconSize = 18;
+    const iconX = x - width / 2 + 20;
+    drawIcon(ctx, getNodeIcon('service'), iconX, y, iconSize, colors.text);
+
+    // Label (shifted right to make room for icon)
+    drawLabel(ctx, x + 10, y, label, colors.text, width - 45);
 }
 
 /**
@@ -341,7 +347,8 @@ function drawLabel(
     x: number,
     y: number,
     text: string,
-    color: string
+    color: string,
+    maxWidth: number = 100
 ): void {
     ctx.font = '500 12px Inter, sans-serif';
     ctx.fillStyle = color;
@@ -349,7 +356,6 @@ function drawLabel(
     ctx.textBaseline = 'middle';
 
     // Truncate long labels
-    const maxWidth = 100;
     let displayText = text;
     if (ctx.measureText(text).width > maxWidth) {
         while (ctx.measureText(displayText + '...').width > maxWidth && displayText.length > 0) {
