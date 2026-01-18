@@ -104,9 +104,15 @@ export class AnimationEngine {
         const deltaTime = currentTime - this.lastTime;
         this.lastTime = currentTime;
 
-        this.canvas.updateParticles(deltaTime, this.speed);
-        this.updateEventSpawning(deltaTime);
-        this.canvas.render();
+        try {
+            this.canvas.updateParticles(deltaTime, this.speed);
+            this.updateEventSpawning(deltaTime);
+            this.canvas.render();
+        } catch (error) {
+            console.error('Animation loop error:', error);
+            this.pause(); // Pause to prevent explosive error logging
+            return;
+        }
 
         this.animationFrame = requestAnimationFrame(() => this.loop());
     }

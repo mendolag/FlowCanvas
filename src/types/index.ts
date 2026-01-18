@@ -18,11 +18,13 @@ export type SizePreset = 'small' | 'medium' | 'large';
 
 // Node attributes
 export interface NodeAttributes {
+    label?: string;
     subsystem?: string;
     delay?: number;
     partitions?: number;
-    transform?: EventShape;
-    transformColor?: string;
+    transform?: EventShape;        // deprecated - use transformation
+    transformColor?: string;       // deprecated - use transformation
+    transformation?: string;       // reference to Transformation name
     x?: number;
     y?: number;
     [key: string]: string | number | undefined;
@@ -58,12 +60,23 @@ export interface PathStep {
 // Event definition
 export interface FlowEvent {
     name: string;
+    label?: string;
     color: string;
     shape: EventShape;
     size: number;
     source: string | null;
     rate: number;
     path?: PathStep[];
+}
+
+// Transformation definition (input -> output event mapping)
+export interface Transformation {
+    name: string;
+    label?: string;
+    input: string;       // input event name
+    output: string;      // output event name
+    outputRate: number;  // ratio of outputs per input (default: 1, fanout/aggregation deferred)
+    delay: number;       // ms before producing output (default: 0)
 }
 
 // Subsystem definition
@@ -84,6 +97,7 @@ export interface Topology {
     nodes: Node[];
     edges: Edge[];
     events: FlowEvent[];
+    transformations: Transformation[];
     subsystems: Subsystem[];
     errors: ParseError[];
 }

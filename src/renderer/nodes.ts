@@ -52,26 +52,29 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: LayoutNode): void 
     const size = getNodeSize(type);
     const colors = getNodeColors(type);
 
+    // Use label if available, otherwise fall back to id
+    const displayLabel = (attributes?.label as string) || id;
+
     ctx.save();
 
     switch (type) {
         case 'service':
-            drawService(ctx, x, y, size, colors, id);
+            drawService(ctx, x, y, size, colors, displayLabel);
             break;
         case 'topic':
-            drawTopic(ctx, x, y, size, colors, id, attributes.partitions);
+            drawTopic(ctx, x, y, size, colors, displayLabel, attributes.partitions);
             break;
         case 'db':
-            drawDatabase(ctx, x, y, size, colors, id);
+            drawDatabase(ctx, x, y, size, colors, displayLabel);
             break;
         case 'processor':
-            drawProcessor(ctx, x, y, size, colors, id);
+            drawProcessor(ctx, x, y, size, colors, displayLabel);
             break;
         case 'external':
-            drawExternal(ctx, x, y, size, colors, id);
+            drawExternal(ctx, x, y, size, colors, displayLabel);
             break;
         default:
-            drawService(ctx, x, y, size, colors, id);
+            drawService(ctx, x, y, size, colors, displayLabel);
     }
 
     ctx.restore();

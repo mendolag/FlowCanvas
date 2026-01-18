@@ -17,6 +17,7 @@ import type {
     Point,
     BezierPath,
     Side,
+    Transformation,
 } from '../types';
 
 /**
@@ -546,6 +547,40 @@ export class FlowCanvas {
     }
 
     /**
+     * Apply transformation to a particle at a node
+     * Supports both new Transformation entities and legacy transform/transformColor
+     */
+    private applyNodeTransformation(particle: Particle, node: LayoutNode): void {
+        // First check for new-style transformation entity reference
+        if (node.attributes?.transformation && this.topology?.transformations) {
+            const trans = this.topology.transformations.find(
+                t => t.name === node.attributes.transformation
+            );
+            if (trans) {
+                // Find the output event and apply its properties
+                const outputEvent = this.topology.events.find(e => e.name === trans.output);
+                if (outputEvent) {
+                    particle.event.shape = outputEvent.shape;
+                    particle.event.color = outputEvent.color;
+                    particle.event.size = outputEvent.size;
+                    if (outputEvent.label) {
+                        particle.event.label = outputEvent.label;
+                    }
+                }
+                return; // Transformation entity takes precedence
+            }
+        }
+
+        // Fall back to legacy transform/transformColor on node attributes
+        if (node.attributes?.transform) {
+            particle.event.shape = node.attributes.transform;
+        }
+        if (node.attributes?.transformColor) {
+            particle.event.color = node.attributes.transformColor;
+        }
+    }
+
+    /**
      * Update particle positions
      */
     updateParticles(deltaTime: number, speed: number = 1): Particle[] {
@@ -612,13 +647,8 @@ export class FlowCanvas {
 
             if (delayed.remainingDelay <= 0) {
                 const node = this.layoutNodes.get(delayed.atNodeId);
-                if (node?.attributes) {
-                    if (node.attributes.transform) {
-                        delayed.particle.event.shape = node.attributes.transform;
-                    }
-                    if (node.attributes.transformColor) {
-                        delayed.particle.event.color = node.attributes.transformColor;
-                    }
+                if (node) {
+                    this.applyNodeTransformation(delayed.particle, node);
                 }
 
                 const nextEdge = getNextEdge(delayed.particle, delayed.atNodeId);
@@ -666,13 +696,8 @@ export class FlowCanvas {
                         totalDelay: delay
                     });
                 } else {
-                    if (targetNode?.attributes) {
-                        if (targetNode.attributes.transform) {
-                            particle.event.shape = targetNode.attributes.transform;
-                        }
-                        if (targetNode.attributes.transformColor) {
-                            particle.event.color = targetNode.attributes.transformColor;
-                        }
+                    if (targetNode) {
+                        this.applyNodeTransformation(particle, targetNode);
                     }
 
                     const nextEdge = getNextEdge(particle, targetNodeId);
