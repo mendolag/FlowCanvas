@@ -11,6 +11,7 @@
 
 import type { NodeType, NodeColors, NodeSize, Side, Point, LayoutNode } from '../types';
 import { drawIcon, getNodeIcon } from './icons';
+import { drawShape } from './shapes';
 
 // Node colors by type
 const NODE_COLORS: Record<NodeType, NodeColors> = {
@@ -57,33 +58,37 @@ export function drawNode(ctx: CanvasRenderingContext2D, node: LayoutNode): void 
 
     ctx.save();
 
+    // Draw the base shape
+    drawShape(ctx, type, x, y, size.width, size.height, colors);
+
+    // Draw specific content on top
     switch (type) {
         case 'service':
-            drawService(ctx, x, y, size, colors, displayLabel);
+            drawServiceContent(ctx, x, y, size, colors, displayLabel);
             break;
         case 'topic':
-            drawTopic(ctx, x, y, size, colors, displayLabel, attributes.partitions);
+            drawTopicContent(ctx, x, y, size, colors, displayLabel, attributes.partitions);
             break;
         case 'db':
-            drawDatabase(ctx, x, y, size, colors, displayLabel);
+            drawDatabaseContent(ctx, x, y, size, colors, displayLabel);
             break;
         case 'processor':
-            drawProcessor(ctx, x, y, size, colors, displayLabel);
+            drawProcessorContent(ctx, x, y, size, colors, displayLabel);
             break;
         case 'external':
-            drawExternal(ctx, x, y, size, colors, displayLabel);
+            drawExternalContent(ctx, x, y, size, colors, displayLabel);
             break;
         default:
-            drawService(ctx, x, y, size, colors, displayLabel);
+            drawServiceContent(ctx, x, y, size, colors, displayLabel);
     }
 
     ctx.restore();
 }
 
 /**
- * Draw a service node (rounded rectangle with icon)
+ * Draw service node content (icon + label)
  */
-function drawService(
+function drawServiceContent(
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
@@ -91,39 +96,21 @@ function drawService(
     colors: NodeColors,
     label: string
 ): void {
-    const { width, height } = size;
-    const radius = 8;
-
-    // Shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-
-    // Rounded rectangle
-    ctx.beginPath();
-    ctx.roundRect(x - width / 2, y - height / 2, width, height, radius);
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-
-    // Reset shadow for border
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = colors.stroke;
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    const { width } = size;
 
     // Icon on left side
     const iconSize = 18;
     const iconX = x - width / 2 + 20;
     drawIcon(ctx, getNodeIcon('service'), iconX, y, iconSize, colors.text);
 
-    // Label (shifted right to make room for icon)
+    // Label (shifted right)
     drawLabel(ctx, x + 10, y, label, colors.text, width - 45);
 }
 
 /**
- * Draw a topic node (horizontal pipe)
+ * Draw topic node content (label + partitions)
  */
-function drawTopic(
+function drawTopicContent(
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
@@ -133,55 +120,15 @@ function drawTopic(
     partitions?: number
 ): void {
     const { width, height } = size;
-    const capWidth = 12;
-    const bodyWidth = width - capWidth * 2;
-
-    // Shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-
-    // Left cap (ellipse)
-    ctx.beginPath();
-    ctx.ellipse(x - bodyWidth / 2, y, capWidth, height / 2, 0, 0, Math.PI * 2);
-    ctx.fillStyle = colors.stroke;
-    ctx.fill();
-
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
-
-    // Main body (rectangle)
-    ctx.beginPath();
-    ctx.rect(x - bodyWidth / 2, y - height / 2, bodyWidth, height);
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-
-    // Right cap (ellipse)
-    ctx.beginPath();
-    ctx.ellipse(x + bodyWidth / 2, y, capWidth, height / 2, 0, 0, Math.PI * 2);
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-    ctx.strokeStyle = colors.stroke;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Border on body
-    ctx.beginPath();
-    ctx.moveTo(x - bodyWidth / 2, y - height / 2);
-    ctx.lineTo(x + bodyWidth / 2, y - height / 2);
-    ctx.moveTo(x - bodyWidth / 2, y + height / 2);
-    ctx.lineTo(x + bodyWidth / 2, y + height / 2);
-    ctx.strokeStyle = colors.stroke;
-    ctx.lineWidth = 2;
-    ctx.stroke();
 
     // Label
     drawLabel(ctx, x, y, label, colors.text);
 
     // Partitions badge
     if (partitions) {
-        const badgeX = x + bodyWidth / 2 + capWidth - 8;
-        const badgeY = y - height / 2 - 5;
+        // Position relative to the "standard" pipe shape
+        const badgeX = x + width / 2; // Right edge
+        const badgeY = y - height / 2; // Top edge
 
         ctx.beginPath();
         ctx.arc(badgeX, badgeY, 12, 0, Math.PI * 2);
@@ -200,9 +147,9 @@ function drawTopic(
 }
 
 /**
- * Draw a database node (vertical cylinder)
+ * Draw database node content (label)
  */
-function drawDatabase(
+function drawDatabaseContent(
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
@@ -210,60 +157,14 @@ function drawDatabase(
     colors: NodeColors,
     label: string
 ): void {
-    const { width, height } = size;
-    const capHeight = 12;
-    const bodyHeight = height - capHeight;
-
-    // Shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-
-    // Main body
-    ctx.beginPath();
-    ctx.rect(x - width / 2, y - height / 2 + capHeight / 2, width, bodyHeight);
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
-
-    // Bottom ellipse
-    ctx.beginPath();
-    ctx.ellipse(x, y + height / 2 - capHeight / 2, width / 2, capHeight, 0, 0, Math.PI * 2);
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-    ctx.strokeStyle = colors.stroke;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Top ellipse
-    ctx.beginPath();
-    ctx.ellipse(x, y - height / 2 + capHeight / 2, width / 2, capHeight, 0, 0, Math.PI * 2);
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-    ctx.strokeStyle = colors.stroke;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Side borders
-    ctx.beginPath();
-    ctx.moveTo(x - width / 2, y - height / 2 + capHeight / 2);
-    ctx.lineTo(x - width / 2, y + height / 2 - capHeight / 2);
-    ctx.moveTo(x + width / 2, y - height / 2 + capHeight / 2);
-    ctx.lineTo(x + width / 2, y + height / 2 - capHeight / 2);
-    ctx.strokeStyle = colors.stroke;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Label
+    // Label (shifted down slightly to avoid top cylinder rim)
     drawLabel(ctx, x, y + 5, label, colors.text);
 }
 
 /**
- * Draw a processor node (hexagon)
+ * Draw processor node content (label)
  */
-function drawProcessor(
+function drawProcessorContent(
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
@@ -271,41 +172,13 @@ function drawProcessor(
     colors: NodeColors,
     label: string
 ): void {
-    const { width, height } = size;
-    const sideWidth = width * 0.2;
-
-    // Shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-
-    // Hexagon path
-    ctx.beginPath();
-    ctx.moveTo(x - width / 2 + sideWidth, y - height / 2);
-    ctx.lineTo(x + width / 2 - sideWidth, y - height / 2);
-    ctx.lineTo(x + width / 2, y);
-    ctx.lineTo(x + width / 2 - sideWidth, y + height / 2);
-    ctx.lineTo(x - width / 2 + sideWidth, y + height / 2);
-    ctx.lineTo(x - width / 2, y);
-    ctx.closePath();
-
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = colors.stroke;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-
-    // Label
     drawLabel(ctx, x, y, label, colors.text);
 }
 
 /**
- * Draw an external system node (cloud-like shape)
+ * Draw external node content (label)
  */
-function drawExternal(
+function drawExternalContent(
     ctx: CanvasRenderingContext2D,
     x: number,
     y: number,
@@ -313,32 +186,6 @@ function drawExternal(
     colors: NodeColors,
     label: string
 ): void {
-    const { width, height } = size;
-
-    // Shadow
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
-    ctx.shadowBlur = 10;
-    ctx.shadowOffsetY = 4;
-
-    // Simplified cloud using overlapping circles
-    ctx.beginPath();
-
-    // Base ellipse
-    ctx.ellipse(x, y + 5, width / 2, height / 3, 0, 0, Math.PI * 2);
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-
-    // Top bumps
-    ctx.beginPath();
-    ctx.arc(x - width / 4, y - 5, height / 3, 0, Math.PI * 2);
-    ctx.arc(x + width / 6, y - 8, height / 2.8, 0, Math.PI * 2);
-    ctx.fillStyle = colors.fill;
-    ctx.fill();
-
-    // Reset shadow
-    ctx.shadowColor = 'transparent';
-
-    // Label
     drawLabel(ctx, x, y + 5, label, colors.text);
 }
 

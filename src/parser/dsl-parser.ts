@@ -593,7 +593,7 @@ export function parseDSL(dsl: string): Topology {
 
     // Build result
     result.nodes = Array.from(nodeMap.values());
-    result.events = flowEvents.length > 0 ? flowEvents : Array.from(eventMap.values());
+    result.events = [...Array.from(eventMap.values()), ...flowEvents];
     result.transformations = Array.from(transformationMap.values());
     result.subsystems = Array.from(subsystemMap.values());
 
