@@ -1,13 +1,97 @@
 /**
  * Sample DSL topologies for FlowCanvas
  * Using DSL v2 specification with event, transformation, and node blocks
+ * All edge connections are now defined via flow paths
  */
 
-export type ExampleName = 'payment' | 'mapic' | 'ecommerce' | 'etl';
+export type ExampleName = 'simple' | 'payment' | 'mapic' | 'ecommerce' | 'etl';
 
 export const EXAMPLES: Record<ExampleName, string> = {
-  // Payment Processing - Full DSL v2 example
-  payment: `# Payment Processing System
+    // Simple example - minimal setup for debugging
+    simple: `# Simple Flow Example
+# 2 input topics -> 1 service -> 2 output topics
+
+# Event definitions
+event InputEventA {
+    label: "Event A"
+    color: "#3b82f6"
+    shape: circle
+    size: medium
+}
+
+event InputEventB {
+    label: "Event B"
+    color: "#e11d48"
+    shape: triangle
+    size: medium
+}
+
+event OutputEventX {
+    label: "Output X"
+    color: "#10b981"
+    shape: square
+    size: medium
+}
+
+event OutputEventY {
+    label: "Output Y"
+    color: "#f59e0b"
+    shape: diamond
+    size: medium
+}
+
+# Node definitions
+node topicA {
+    label: "Topic A"
+    type: topic
+    position: (-200, -50)
+}
+
+node topicB {
+    label: "Topic B"
+    type: topic
+    position: (-200, 50)
+}
+
+node processor {
+    label: "Processor"
+    type: service
+    position: (100, 0)
+}
+
+node topicX {
+    label: "Topic X"
+    type: topic
+    position: (400, -50)
+}
+
+node topicY {
+    label: "Topic Y"
+    type: topic
+    position: (400, 50)
+}
+
+# Flow A: topicA -> processor -> topicX
+flow FlowA {
+    label: "Flow A to X"
+    event: InputEventA
+    source: topicA
+    rate: 2
+    path: topicA:right -> processor:left -> processor:right -> topicX:left
+}
+
+# Flow B: topicB -> processor -> topicY
+flow FlowB {
+    label: "Flow B to Y"
+    event: InputEventB
+    source: topicB
+    rate: 1.5
+    path: topicB:right -> processor:left -> processor:right -> topicY:left
+}
+`,
+
+    // Payment Processing - Full DSL v2 example
+    payment: `# Payment Processing System
 # Demonstrates DSL v2: events, transformations, nodes with labels
 
 # Event definitions
@@ -93,21 +177,25 @@ subsystem "Backend Services" {
     color: "#6366f1"
 }
 
-# Data flows (edge shorthand)
-WebGateway -> OrderAPI -> PaymentSvc -> NotifySvc -> UserInbox
-PaymentSvc -> OrdersDB
-
-# Flow definition
+# Flow definitions - edges are generated from paths
 flow OrderFlow {
     label: "Order Processing Flow"
     event: OrderCreated
     source: WebGateway
     rate: 1.5
     path: WebGateway -> OrderAPI -> PaymentSvc -> NotifySvc -> UserInbox
+}
+
+flow DatabaseFlow {
+    label: "Database Persistence"
+    event: PaymentProcessed
+    source: PaymentSvc
+    rate: 1.5
+    path: PaymentSvc -> OrdersDB
 }`,
 
-  // MAPIC Mail Processing - Complex routing example
-  mapic: `# MAPIC Mail Processing System
+    // MAPIC Mail Processing - Complex routing example
+    mapic: `# MAPIC Mail Processing System
 # Complex event routing with path-level transformations
 
 # Event definitions
@@ -232,30 +320,13 @@ subsystem "MAPIC" {
     color: "#6366f1"
 }
 
-# Data flows with explicit sides
-sorting:right -> Normalizer:left
-nes:right -> Normalizer:left
-
-# Identity resolution loop
-Normalizer:top -> identity:left
-identity:right -> KeyProvider:left
-KeyProvider:bottom -> assignment:right
-assignment:left -> Normalizer:right
-
-# Output flow
-Normalizer:bottom -> normalizedEvents:left
-normalizedEvents:right -> Consolidator:left
-Consolidator:right -> mailpieceState:left
-normalizedEvents:top -> historyMapper -> history
-mailpieceState -> summaryMapper -> summary
-
-# Flows with path-level transformations
+# Flow definitions with side specifications for correct edge routing
 flow SortingFlow {
     label: "Sorting Processing"
     event: SortingEvent
     source: sorting
     rate: 2
-    path: sorting -> Normalizer[shape=circle, color=#3b82f6] -> identity -> KeyProvider[shape=key, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#10b981] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState
+    path: sorting:right -> Normalizer:left -> Normalizer:top -> identity:left -> identity:right -> KeyProvider:left -> KeyProvider:bottom -> assignment:right -> assignment:left -> Normalizer:right -> Normalizer:bottom -> normalizedEvents:left -> normalizedEvents:right -> Consolidator:left -> Consolidator:right -> mailpieceState:left
 }
 
 flow NESFlow {
@@ -263,11 +334,27 @@ flow NESFlow {
     event: NESEvent
     source: nes
     rate: 0.3
-    path: nes -> Normalizer[shape=circle, color=#e11d48] -> identity -> KeyProvider[shape=key, color=#f2f542] -> assignment -> Normalizer[shape=triangle, color=#f59042] -> normalizedEvents -> Consolidator[shape=square] -> mailpieceState
+    path: nes:right -> Normalizer:left -> Normalizer:top -> identity:left -> identity:right -> KeyProvider:left -> KeyProvider:bottom -> assignment:right -> assignment:left -> Normalizer:right -> Normalizer:bottom -> normalizedEvents:left -> normalizedEvents:right -> Consolidator:left -> Consolidator:right -> mailpieceState:left
+}
+
+flow HistoryFlow {
+    label: "History Export"
+    event: NormalizedEvent
+    source: normalizedEvents
+    rate: 1
+    path: normalizedEvents:top -> historyMapper:left -> historyMapper:right -> history:left
+}
+
+flow SummaryFlow {
+    label: "Summary Export"
+    event: ConsolidatedEvent
+    source: mailpieceState
+    rate: 0.5
+    path: mailpieceState:right -> summaryMapper:left -> summaryMapper:right -> summary:left
 }`,
 
-  // E-Commerce - Subsystems and multiple event types
-  ecommerce: `# E-Commerce Order Processing
+    // E-Commerce - Subsystems and multiple event types
+    ecommerce: `# E-Commerce Order Processing
 # Multiple subsystems and event types with transformations
 
 # Event definitions
@@ -396,15 +483,9 @@ subsystem "Backend" {
     color: "#6366f1"
 }
 
-# Data flows
-web-gateway -> order-api -> orders -> payment-service
-payment-service -> payments -> notification-service
-order-api -> orders -> inventory-service
-inventory-service -> inventory-updates
-payment-service -> orders-db
-
-# Flows
+# Flow definitions - all edges generated from paths
 flow OrderProcessing {
+    label: "Order Processing"
     event: Order
     source: web-gateway
     rate: 1.5
@@ -412,6 +493,7 @@ flow OrderProcessing {
 }
 
 flow BulkOrderProcessing {
+    label: "Bulk Order"
     event: BulkOrder
     source: web-gateway
     rate: 0.3
@@ -419,14 +501,15 @@ flow BulkOrderProcessing {
 }
 
 flow AlertProcessing {
+    label: "Inventory Alerts"
     event: AlertEvent
     source: web-gateway
     rate: 0.2
     path: web-gateway -> order-api -> orders -> inventory-service -> inventory-updates
 }`,
 
-  // ETL Pipeline - Processor chain with transformations
-  etl: `# ETL Data Pipeline
+    // ETL Pipeline - Processor chain with transformations
+    etl: `# ETL Data Pipeline
 # Sequential processing with transformations at each stage
 
 # Event definitions
@@ -552,13 +635,7 @@ subsystem "Processing" {
     color: "#f59e0b"
 }
 
-# Data flows
-source-db -> extractor -> raw-data
-file-ingestion -> extractor
-raw-data -> transformer -> transformed-data
-transformed-data -> loader -> data-warehouse
-
-# Flows
+# Flow definitions - all edges generated from paths
 flow DBFlow {
     label: "Database Records"
     event: DBRecord
@@ -580,5 +657,5 @@ flow FileFlow {
  * Get an example by name
  */
 export function getExample(name: string): string {
-  return EXAMPLES[name as ExampleName] || EXAMPLES.payment;
+    return EXAMPLES[name as ExampleName] || EXAMPLES.payment;
 }

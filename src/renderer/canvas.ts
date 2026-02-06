@@ -603,11 +603,22 @@ export class FlowCanvas {
                         }
                     }
 
-                    if (currentPathIndex + 2 < currentParticle.event.path.length) {
-                        const nextTarget = currentParticle.event.path[currentPathIndex + 2].nodeId;
-                        const edge = this.layoutEdges.find(e => e.from === nodeId && e.to === nextTarget);
+                    let nextStepIdx = currentPathIndex + 2;
+                    let nextTargetId = nextStepIdx < currentParticle.event.path.length
+                        ? currentParticle.event.path[nextStepIdx].nodeId
+                        : null;
+
+                    // Skip self-referencing steps (e.g. processor:left -> processor:right)
+                    // This prevents "bounce back" loops where the particle exits and re-enters the same node
+                    while (nextTargetId === nodeId && nextStepIdx < currentParticle.event.path.length - 1) {
+                        nextStepIdx++;
+                        nextTargetId = currentParticle.event.path[nextStepIdx].nodeId;
+                    }
+
+                    if (nextTargetId) {
+                        const edge = this.layoutEdges.find(e => e.from === nodeId && e.to === nextTargetId);
                         if (edge) {
-                            currentParticle.pathIndex++;
+                            currentParticle.pathIndex = nextStepIdx - 1;
                             return edge;
                         }
                     }
@@ -715,6 +726,8 @@ export class FlowCanvas {
 
         return completedParticles;
     }
+
+
 
     /**
      * Draw all particles

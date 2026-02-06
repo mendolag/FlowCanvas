@@ -40,7 +40,8 @@ export class AnimationEngine {
     }
 
     /**
-     * Initialize timers for each event type
+     * Initialize timers for each flow event (events with a source)
+     * Raw event definitions without a source/path are just templates
      */
     initEventTimers(): void {
         this.eventTimers.clear();
@@ -48,7 +49,11 @@ export class AnimationEngine {
         const topology = this.canvas.topology;
         if (!topology) return;
 
+        // Only create timers for flow events (events with a valid source node)
+        // Raw event definitions are templates, not spawnable flows
         for (const event of topology.events) {
+            if (!event.source) continue;
+
             const rate = event.rate || this.globalSpawnRate;
             this.eventTimers.set(event.name, {
                 event,
@@ -153,7 +158,7 @@ export class AnimationEngine {
     spawnEvent(event: FlowEvent, sourceNodes: string[]): void {
         if (sourceNodes.length === 0) return;
 
-        let sourceNode: string;
+        let sourceNode: string | undefined;
 
         if (event.source) {
             if (sourceNodes.includes(event.source)) {
@@ -162,15 +167,14 @@ export class AnimationEngine {
                 const nodeExists = this.canvas.layoutNodes.has(event.source);
                 if (nodeExists) {
                     sourceNode = event.source;
-                } else {
-                    sourceNode = sourceNodes[Math.floor(Math.random() * sourceNodes.length)];
                 }
             }
-        } else {
-            sourceNode = sourceNodes[Math.floor(Math.random() * sourceNodes.length)];
         }
 
-        this.canvas.addParticle(event, sourceNode);
+        // If no valid source found, do not spawn (strict mode)
+        if (sourceNode) {
+            this.canvas.addParticle(event, sourceNode);
+        }
     }
 
     /**

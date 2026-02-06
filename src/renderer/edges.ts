@@ -143,9 +143,29 @@ export function getEdgePath(
         controlDist = Math.max(Math.abs(dy) * 0.5 + 50, 100);
     }
 
-    // Apply offset for parallel edges
-    if (offsetIndex > 0) {
-        controlDist += offsetIndex * 20;
+    // Clamp control distance to prevent loops/overshoot ("bounce back")
+    // This happens when the handles are longer than the gap between nodes
+    if (!isBackward) {
+        // Project the distance onto the start direction
+        const projectedDist = (dx * startDir.x + dy * startDir.y);
+
+        // If we're moving roughly in the right direction (dot product > 0)
+        // Ensure handles don't cross the midpoint
+        if (projectedDist > 0) {
+            // Check if start and end are opposing (e.g. Right -> Left)
+            // If so, we share the gap 50/50. If orthogonal, we can be more lenient.
+            const isOpposing = (startDir.x === -endDir.x && startDir.y === -endDir.y);
+
+            if (isOpposing) {
+                controlDist = Math.min(controlDist, projectedDist / 2 - 10);
+            } else {
+                // Orthogonal (e.g. Right -> Bottom), just valid crossing prevention
+                controlDist = Math.min(controlDist, projectedDist * 0.8);
+            }
+
+            // Keep a minimum to ensure curve functionality unless purely linear
+            controlDist = Math.max(controlDist, 10);
+        }
     }
 
     return {

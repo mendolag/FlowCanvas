@@ -134,8 +134,19 @@ export function parseDSL(dsl: string): Topology {
             if (content[pos] === ':') pos++;
             skipWhitespace();
 
+            // Special handling for 'path' - read raw string until newline or semicolon
+            if (key === 'path') {
+                let pathStr = '';
+                // Read until semicolon or closing brace (without consuming brace)
+                while (pos < content.length &&
+                    content[pos] !== ';' &&
+                    content[pos] !== '}') {
+                    pathStr += content[pos++];
+                }
+                block[key] = pathStr.trim();
+            }
             // Check for array
-            if (content[pos] === '[') {
+            else if (content[pos] === '[') {
                 pos++; // skip [
                 const arr: string[] = [];
                 while (pos < content.length && content[pos] !== ']') {
@@ -177,11 +188,14 @@ export function parseDSL(dsl: string): Topology {
             else if (content[pos] === '"' || content[pos] === "'") {
                 block[key] = parseString();
             }
-            // Check for number or identifier
+            // Check for number (starts with digit or negative sign)
+            else if (/[0-9\-]/.test(content[pos])) {
+                block[key] = parseNumber();
+            }
+            // Identifier (e.g., keyword like "service", "topic", etc.)
             else {
                 const value = parseIdentifier();
-                const numValue = parseFloat(value);
-                block[key] = isNaN(numValue) ? value : numValue;
+                block[key] = value;
             }
 
             skipWhitespace();
@@ -198,10 +212,11 @@ export function parseDSL(dsl: string): Topology {
         for (const segment of segments) {
             if (!segment) continue;
 
-            // Check for attributes: NodeName[key=value, ...]
+            // Check for attributes: NodeName:side[key=value, ...]
             const match = segment.match(/^([a-zA-Z0-9_\-]+)(?::([a-z]+))?\s*(?:\[(.+)\])?$/);
             if (match) {
                 const nodeId = match[1];
+                const side = match[2] as Side | undefined;  // Optional side specification
                 const attributes: Record<string, string> = {};
 
                 if (match[3]) {
@@ -219,6 +234,7 @@ export function parseDSL(dsl: string): Topology {
 
                 steps.push({
                     nodeId,
+                    side: VALID_SIDES.includes(side as Side) ? side : undefined,
                     attributes: Object.keys(attributes).length > 0 ? attributes : null
                 });
             }
@@ -320,12 +336,12 @@ export function parseDSL(dsl: string): Topology {
                     const name = parseIdentifier();
                     const block = parseBlock();
 
+
                     // Get the base event
                     const baseEventName = block.event as string;
                     const baseEvent = eventMap.get(baseEventName);
 
-                    // Parse path from remaining content in block
-                    // For now, path is parsed separately below
+                    const pathSteps = block.path ? parsePath(block.path as string) : undefined;
 
                     const flowEvent: FlowEvent = {
                         name: name,
@@ -335,8 +351,43 @@ export function parseDSL(dsl: string): Topology {
                         size: baseEvent?.size || 1,
                         source: (block.source as string) || null,
                         rate: typeof block.rate === 'number' ? block.rate : 2,
-                        path: undefined // Will be parsed from path property
+                        path: pathSteps
                     };
+
+                    // Generate edges from path
+                    if (pathSteps && pathSteps.length > 1) {
+                        for (let i = 0; i < pathSteps.length - 1; i++) {
+                            const fromStep = pathSteps[i];
+                            const toStep = pathSteps[i + 1];
+                            const fromNode = fromStep.nodeId;
+                            const toNode = toStep.nodeId;
+
+                            // Create nodes if they don't exist
+                            if (!nodeMap.has(fromNode)) {
+                                nodeMap.set(fromNode, { id: fromNode, type: 'service', attributes: {} });
+                            }
+                            if (!nodeMap.has(toNode)) {
+                                nodeMap.set(toNode, { id: toNode, type: 'service', attributes: {} });
+                            }
+
+                            // Use specified sides or defaults (right -> left)
+                            const fromSide: Side = fromStep.side || 'right';
+                            const toSide: Side = toStep.side || 'left';
+
+                            // Add edge (avoid duplicates)
+                            const edgeExists = result.edges.some(
+                                e => e.from === fromNode && e.to === toNode
+                            );
+                            if (!edgeExists) {
+                                result.edges.push({
+                                    from: fromNode,
+                                    to: toNode,
+                                    fromSide,
+                                    toSide
+                                });
+                            }
+                        }
+                    }
 
                     flowEvents.push(flowEvent);
                     break;

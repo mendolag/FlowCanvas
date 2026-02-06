@@ -54,6 +54,7 @@ export interface Edge {
 // Path step for event routing
 export interface PathStep {
     nodeId: string;
+    side?: Side;  // Which side of the node the connection attaches to
     attributes: Record<string, string> | null;
 }
 

@@ -142,6 +142,7 @@ export function Editor() {
 
             <div className="examples-bar">
                 <span className="examples-label">Examples:</span>
+                <button className="example-btn" onClick={() => loadExample('simple')}>Simple</button>
                 <button className="example-btn" onClick={() => loadExample('mapic')}>MAPIC</button>
                 <button className="example-btn" onClick={() => loadExample('ecommerce')}>E-Commerce</button>
                 <button className="example-btn" onClick={() => loadExample('etl')}>ETL Pipeline</button>
