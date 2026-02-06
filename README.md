@@ -79,6 +79,9 @@ my-service -> orders-topic
 
 # Chained connections
 source -> process -> sink
+
+# Directed connection (In: Left, Out: Right)
+l:my-service:r -> l:orders-topic
 ```
 
 ### Subsystems

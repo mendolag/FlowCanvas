@@ -77,7 +77,7 @@ flow FlowA {
     event: InputEventA
     source: topicA
     rate: 2
-    path: topicA:right -> processor:left -> processor:right -> topicX:left
+    path: topicA:r -> l:processor:r -> l:topicX
 }
 
 # Flow B: topicB -> processor -> topicY
@@ -86,7 +86,7 @@ flow FlowB {
     event: InputEventB
     source: topicB
     rate: 1.5
-    path: topicB:right -> processor:left -> processor:right -> topicY:left
+    path: topicB:r -> l:processor:r -> l:topicY
 }
 `,
 
@@ -326,7 +326,7 @@ flow SortingFlow {
     event: SortingEvent
     source: sorting
     rate: 2
-    path: sorting:right -> Normalizer:left -> Normalizer:top -> identity:left -> identity:right -> KeyProvider:left -> KeyProvider:bottom -> assignment:right -> assignment:left -> Normalizer:right -> Normalizer:bottom -> normalizedEvents:left -> normalizedEvents:right -> Consolidator:left -> Consolidator:right -> mailpieceState:left
+    path: sorting:r -> l:Normalizer:t -> l:identity:r -> l:KeyProvider:b -> r:assignment:l -> r:Normalizer:b -> l:normalizedEvents:r -> l:Consolidator:r -> l:mailpieceState
 }
 
 flow NESFlow {
@@ -334,7 +334,7 @@ flow NESFlow {
     event: NESEvent
     source: nes
     rate: 0.3
-    path: nes:right -> Normalizer:left -> Normalizer:top -> identity:left -> identity:right -> KeyProvider:left -> KeyProvider:bottom -> assignment:right -> assignment:left -> Normalizer:right -> Normalizer:bottom -> normalizedEvents:left -> normalizedEvents:right -> Consolidator:left -> Consolidator:right -> mailpieceState:left
+    path: nes:r -> l:Normalizer:t -> l:identity:r -> l:KeyProvider:b -> r:assignment:l -> r:Normalizer:b -> l:normalizedEvents:r -> l:Consolidator:r -> l:mailpieceState
 }
 
 flow HistoryFlow {
@@ -342,7 +342,7 @@ flow HistoryFlow {
     event: NormalizedEvent
     source: normalizedEvents
     rate: 1
-    path: normalizedEvents:top -> historyMapper:left -> historyMapper:right -> history:left
+    path: normalizedEvents:t -> l:historyMapper:r -> l:history
 }
 
 flow SummaryFlow {
@@ -350,7 +350,7 @@ flow SummaryFlow {
     event: ConsolidatedEvent
     source: mailpieceState
     rate: 0.5
-    path: mailpieceState:right -> summaryMapper:left -> summaryMapper:right -> summary:left
+    path: mailpieceState:r -> l:summaryMapper:r -> l:summary
 }`,
 
     // E-Commerce - Subsystems and multiple event types

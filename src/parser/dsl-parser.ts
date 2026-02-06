@@ -212,32 +212,73 @@ export function parseDSL(dsl: string): Topology {
         for (const segment of segments) {
             if (!segment) continue;
 
-            // Check for attributes: NodeName:side[key=value, ...]
-            const match = segment.match(/^([a-zA-Z0-9_\-]+)(?::([a-z]+))?\s*(?:\[(.+)\])?$/);
-            if (match) {
-                const nodeId = match[1];
-                const side = match[2] as Side | undefined;  // Optional side specification
-                const attributes: Record<string, string> = {};
+            let cleanSegment = segment;
+            let attributes: Record<string, string> | null = null;
 
-                if (match[3]) {
-                    // Parse attributes
-                    match[3].split(',').forEach(pair => {
+            // Extract attributes [key=val]
+            const bracketStart = segment.indexOf('[');
+            if (bracketStart > 0) {
+                const bracketEnd = segment.lastIndexOf(']');
+                if (bracketEnd > bracketStart) {
+                    const attrStr = segment.substring(bracketStart + 1, bracketEnd);
+                    cleanSegment = segment.substring(0, bracketStart).trim();
+                    attributes = {};
+
+                    attrStr.split(',').forEach(pair => {
                         const [key, val] = pair.split('=').map(p => p.trim());
                         if (key && val) {
-                            attributes[key] = val.replace(/['"]/g, '');
+                            attributes![key] = val.replace(/['"]/g, '');
                         } else if (key && !val) {
-                            // Just a name (transformation reference)
-                            attributes['transformation'] = key;
+                            attributes!['transformation'] = key;
                         }
                     });
                 }
-
-                steps.push({
-                    nodeId,
-                    side: VALID_SIDES.includes(side as Side) ? side : undefined,
-                    attributes: Object.keys(attributes).length > 0 ? attributes : null
-                });
             }
+
+            // Parse ID and directions: l:Node:r
+            const parts = cleanSegment.split(':').map(s => s.trim());
+            let nodeId = parts[0];
+            let inSide: Side | undefined;
+            let outSide: Side | undefined;
+
+            const mapSide = (s: string): Side | undefined => {
+                switch (s.toLowerCase()) {
+                    case 'l': case 'left': return 'left';
+                    case 'r': case 'right': return 'right';
+                    case 't': case 'top': return 'top';
+                    case 'b': case 'bottom': return 'bottom';
+                        return undefined;
+                }
+            };
+
+            if (parts.length === 1) {
+                nodeId = parts[0];
+            } else if (parts.length === 2) {
+                // l:Node or Node:r
+                const s1 = mapSide(parts[0]);
+                const s2 = mapSide(parts[1]);
+                if (s1) {
+                    inSide = s1;
+                    nodeId = parts[1];
+                } else if (s2) {
+                    nodeId = parts[0];
+                    outSide = s2;
+                } else {
+                    nodeId = parts[0];
+                }
+            } else if (parts.length >= 3) {
+                // l:Node:r
+                inSide = mapSide(parts[0]);
+                outSide = mapSide(parts[parts.length - 1]);
+                nodeId = parts[1];
+            }
+
+            steps.push({
+                nodeId,
+                inSide,
+                outSide,
+                attributes: attributes && Object.keys(attributes).length > 0 ? attributes : null
+            });
         }
 
         return steps;
@@ -371,8 +412,9 @@ export function parseDSL(dsl: string): Topology {
                             }
 
                             // Use specified sides or defaults (right -> left)
-                            const fromSide: Side = fromStep.side || 'right';
-                            const toSide: Side = toStep.side || 'left';
+                            // Source uses outSide, Dest uses inSide
+                            const fromSide: Side = fromStep.outSide || fromStep.side || 'right';
+                            const toSide: Side = toStep.inSide || toStep.side || 'left';
 
                             // Add edge (avoid duplicates)
                             const edgeExists = result.edges.some(
@@ -409,40 +451,75 @@ export function parseDSL(dsl: string): Topology {
                         }
 
                         const parts = edgeLine.split('->').map(p => p.trim());
-                        for (let j = 0; j < parts.length - 1; j++) {
-                            let from = parts[j];
-                            let to = parts[j + 1];
-                            let fromSide: Side = 'right';
-                            let toSide: Side = 'left';
+                        const parsedNodes: { id: string, inSide?: Side, outSide?: Side }[] = [];
 
-                            // Parse sides
-                            if (from.includes(':')) {
-                                const [name, side] = from.split(':');
-                                from = name.trim();
-                                if (VALID_SIDES.includes(side.trim() as Side)) {
-                                    fromSide = side.trim() as Side;
+                        // 1. Parse all node references first
+                        for (const part of parts) {
+                            // cleaner cleanup of bracketed attributes for ID
+                            const cleanPart = part.replace(/\[.*?\]/g, '').trim();
+                            const segments = cleanPart.split(':').map(s => s.trim());
+
+                            let id = segments[0];
+                            let inSide: Side | undefined;
+                            let outSide: Side | undefined;
+
+                            // Map shorthand to full side
+                            const mapSide = (s: string): Side | undefined => {
+                                switch (s.toLowerCase()) {
+                                    case 'l': case 'left': return 'left';
+                                    case 'r': case 'right': return 'right';
+                                    case 't': case 'top': return 'top';
+                                    case 'b': case 'bottom': return 'bottom';
+                                        return undefined;
                                 }
+                            };
+
+                            if (segments.length === 1) {
+                                // "Node" -> default sides
+                                id = segments[0];
+                            } else if (segments.length === 2) {
+                                // "l:Node" (In: l) or "Node:r" (Out: r)
+                                const firstAsSide = mapSide(segments[0]);
+                                const secondAsSide = mapSide(segments[1]);
+
+                                if (firstAsSide) {
+                                    inSide = firstAsSide;
+                                    id = segments[1];
+                                } else if (secondAsSide) {
+                                    id = segments[0];
+                                    outSide = secondAsSide;
+                                } else {
+                                    // Fallback if neither is valid side (maybe some other usage?)
+                                    id = segments[0];
+                                }
+                            } else if (segments.length >= 3) {
+                                // "l:Node:r" -> In: l, Out: r
+                                // We take the first and last as sides, middle as ID
+                                inSide = mapSide(segments[0]);
+                                outSide = mapSide(segments[segments.length - 1]);
+                                id = segments[1];
                             }
-                            if (to.includes(':')) {
-                                const [name, side] = to.split(':');
-                                to = name.trim();
-                                if (VALID_SIDES.includes(side.trim() as Side)) {
-                                    toSide = side.trim() as Side;
-                                }
+
+                            parsedNodes.push({ id, inSide, outSide });
+
+                            // Ensure node exists in map
+                            if (id && !nodeMap.has(id)) {
+                                nodeMap.set(id, { id, type: 'service', attributes: {} });
                             }
+                        }
 
-                            // Remove any trailing attributes from 'to'
-                            to = to.split('[')[0].trim();
+                        // 2. Create edges connecting the nodes
+                        for (let j = 0; j < parsedNodes.length - 1; j++) {
+                            const from = parsedNodes[j];
+                            const to = parsedNodes[j + 1];
 
-                            if (from && to) {
-                                // Create nodes if they don't exist
-                                if (!nodeMap.has(from)) {
-                                    nodeMap.set(from, { id: from, type: 'service', attributes: {} });
-                                }
-                                if (!nodeMap.has(to)) {
-                                    nodeMap.set(to, { id: to, type: 'service', attributes: {} });
-                                }
-                                result.edges.push({ from, to, fromSide, toSide });
+                            if (from.id && to.id) {
+                                result.edges.push({
+                                    from: from.id,
+                                    to: to.id,
+                                    fromSide: from.outSide || 'right', // Default source out: right
+                                    toSide: to.inSide || 'left'        // Default dest in: left
+                                });
                             }
                         }
                     }

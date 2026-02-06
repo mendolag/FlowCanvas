@@ -127,21 +127,29 @@ flow FlowName {
     path: NodeA -> NodeB -> NodeC
 }
 ```
+}
 
 ### Path Syntax with Connection Sides
 
-Specify which side of a node the connection attaches to:
+Specify connection sides using single-letter shorthand:
+-   **Prefix**: Inbound side (where the edge enters)
+-   **Suffix**: Outbound side (where the edge leaves)
+
+Format: `[in]:Node:[out]`
 
 ```text
-path: NodeA:right -> NodeB:left -> NodeB:right -> NodeC:left
+path: NodeA:r -> l:NodeB:r -> l:NodeC
 ```
 
-#### Valid Sides
+-   `NodeA` exits from Right (`:r`)
+-   `NodeB` enters from Left (`l:`), exits from Right (`:r`)
+-   `NodeC` enters from Left (`l:`)
 
-- `left`
-- `right`
-- `top`
-- `bottom`
+#### Valid Sides
+-   `l`, `left`
+-   `r`, `right`
+-   `t`, `top`
+-   `b`, `bottom`
 
 ---
 
@@ -203,7 +211,7 @@ flow OrderFlow {
     event: OrderCreated
     source: WebGateway
     rate: 1.5
-    path: WebGateway -> PaymentSvc -> OrdersDB
+    path: WebGateway:r -> l:PaymentSvc:b -> t:OrdersDB
 }
 ```
 
